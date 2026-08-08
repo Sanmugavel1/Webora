@@ -14,7 +14,10 @@ const VERTEX_SHADER = /* glsl */ `
   void main() {
     vReveal = aReveal;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uPixelRatio * (280.0 / -mvPosition.z);
+    // Camera sits ~4-8 units from these points; this constant targets a
+    // ~4-9px CSS point size at that range (was 280.0 — nearly 40x too big,
+    // blowing every point out into one giant overlapping blob).
+    gl_PointSize = aSize * uPixelRatio * (7.0 / -mvPosition.z);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;

@@ -1,19 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 /**
  * Tracks whether an element is near the viewport. Used to pause expensive
  * work (like the WebGL render loop) for 3D visuals that have scrolled away.
+ *
+ * Uses a callback ref (backed by state) rather than a plain `useRef` — the
+ * element this attaches to is often gated behind an async check (e.g. "is
+ * WebGL supported?") and doesn't exist on the first render. A plain ref's
+ * `.current` wouldn't be tracked as a dependency, so an effect keyed on it
+ * would only ever see `null`; the callback-ref's setState re-triggers the
+ * effect exactly when the real node shows up.
  */
 export function useInView<T extends HTMLElement>(
   rootMargin = "200px",
-): [RefObject<T | null>, boolean] {
-  const ref = useRef<T | null>(null);
+): [(node: T | null) => void, boolean] {
+  const [node, setNode] = useState<T | null>(null);
   const [inView, setInView] = useState(false);
+  const ref = useCallback((el: T | null) => setNode(el), []);
 
   useEffect(() => {
-    const node = ref.current;
     if (!node) return;
 
     const observer = new IntersectionObserver(
@@ -23,7 +30,7 @@ export function useInView<T extends HTMLElement>(
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [rootMargin]);
+  }, [node, rootMargin]);
 
   return [ref, inView];
 }
