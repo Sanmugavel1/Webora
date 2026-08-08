@@ -32,8 +32,11 @@ const FRAGMENT_SHADER = /* glsl */ `
     float dist = length(uv);
     if (dist > 0.5) discard;
 
-    float core = smoothstep(0.16, 0.0, dist);
-    float glow = smoothstep(0.5, 0.0, dist);
+    // smoothstep requires edge0 < edge1 (GLSL spec: undefined otherwise —
+    // some drivers silently return 0), so invert via 1.0 - x rather than
+    // swapping the edge arguments.
+    float core = 1.0 - smoothstep(0.0, 0.16, dist);
+    float glow = 1.0 - smoothstep(0.0, 0.5, dist);
     vec3 color = mix(uGlowColor, uCoreColor, core);
 
     float appear = smoothstep(uProgress - 0.14, uProgress, vReveal);
