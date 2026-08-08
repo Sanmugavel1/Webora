@@ -9,7 +9,7 @@ import { PHONE_TEL } from "@/lib/constants";
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Simple, transparent web development pricing in INR — Standard, Premium and custom Pro packages, GST included, no hidden costs.",
+    "Simple, transparent web development pricing in INR — Standard, Premium and custom Pro packages, no hidden costs.",
   alternates: { canonical: "/pricing" },
 };
 
@@ -55,10 +55,9 @@ export default function PricingPage() {
           </Reveal>
 
           <p className="mx-auto mt-8 max-w-2xl text-center text-xs leading-relaxed text-white/35">
-            All prices are in INR and exclude 18% GST unless noted. Hosting
-            renews annually at ₹4,000 after the first free year. Pricing is
-            current as shared with us and may be revised — call to confirm
-            before starting your project.
+            All prices are in INR. Hosting renews annually at ₹4,000 after
+            the first free year. Pricing is current as shared with us and
+            may be revised — call to confirm before starting your project.
           </p>
         </div>
       </section>

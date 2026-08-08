@@ -40,7 +40,6 @@ export function PricingCard({ pkg, delay = 0 }: PricingCardProps) {
             )}
             <span className="font-display text-4xl font-bold text-white">{pkg.price}</span>
           </div>
-          <p className="mt-1.5 text-xs font-medium text-blue-soft">{pkg.gstNote}</p>
         </div>
 
         <ul className="mt-7 flex-1 space-y-2.5">

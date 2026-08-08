@@ -4,7 +4,6 @@ export interface PricingPackage {
   tagline: string;
   originalPrice: string;
   price: string;
-  gstNote: string;
   features: string[];
   footnote: string;
   featured?: boolean;
@@ -16,7 +15,6 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     tagline: "For businesses getting online.",
     originalPrice: "₹10,000",
     price: "₹5,999",
-    gstNote: "+ 18% GST (₹1,080)",
     features: [
       "5 pages website",
       "1 year free domain name (.com / .in / .org)",
@@ -45,7 +43,6 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     tagline: "For businesses ready to build a stronger digital presence.",
     originalPrice: "₹20,000",
     price: "₹9,999",
-    gstNote: "+ 18% GST (₹1,800)",
     features: [
       "12 pages website",
       "1 year free domain name (.com / .in / .org)",
@@ -77,7 +74,6 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     tagline: "For businesses ready to sell online, built to spec.",
     originalPrice: "",
     price: "Get a Quote",
-    gstNote: "+ 18% GST applicable",
     features: [
       "Pages: according to requirement",
       "1 year free domain name (.com / .in / .org)",
