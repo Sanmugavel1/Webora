@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // A separate, unrelated Vite project (own package.json/eslint config)
+    // that happens to live nested in this directory — not part of this app.
+    "3d-portfolio/**",
   ]),
 ]);
 

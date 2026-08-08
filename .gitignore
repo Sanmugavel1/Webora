@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# unrelated project that happens to live nested in this directory
+/3d-portfolio
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

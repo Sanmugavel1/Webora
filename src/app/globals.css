@@ -1,26 +1,203 @@
 @import "tailwindcss";
 
+/* Gates hover-only micro-interactions to devices that actually have a
+   precise pointer, so tap/touch never gets stuck in a "hover" state. */
+@custom-variant hover-fine (@media (hover: hover) and (pointer: fine));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-navy: #071a33;
+  --color-navy-deep: #050f20;
+  --color-navy-soft: #0e2a4d;
+  --color-blue: #1677ff;
+  --color-blue-soft: #4c9aff;
+  --color-violet: #7c5cff;
+  --color-violet-soft: #a78bfa;
+  --color-teal: #17d4b8;
+  --color-white: #ffffff;
+  --color-mist: #b3c4db;
+  --color-slate: #7e93b3;
+  --color-line: rgba(179, 196, 219, 0.14);
+  --color-whatsapp: #25d366;
+
+  /* Gradients — the shared accent language across every glass surface */
+  --gradient-primary: linear-gradient(135deg, #1677ff 0%, #7c5cff 100%);
+  --gradient-violet: linear-gradient(135deg, #7c5cff 0%, #c084fc 100%);
+  --gradient-teal: linear-gradient(135deg, #0ea5a0 0%, #38ef9a 100%);
+  --gradient-mesh: radial-gradient(ellipse 60% 50% at 15% 10%, rgba(22, 119, 255, 0.22), transparent 60%),
+    radial-gradient(ellipse 55% 45% at 85% 20%, rgba(124, 92, 255, 0.2), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 50% 100%, rgba(23, 212, 184, 0.14), transparent 60%);
+
+  /* Glassmorphism */
+  --glass-bg-dark: rgba(14, 42, 77, 0.45);
+  --glass-bg-dark-strong: rgba(10, 30, 56, 0.65);
+  --glass-border-dark: rgba(255, 255, 255, 0.12);
+  --glass-bg-light: rgba(255, 255, 255, 0.66);
+  --glass-border-light: rgba(255, 255, 255, 0.5);
+
+  --shadow-vibrant: 0 20px 50px rgba(7, 26, 51, 0.12);
+  --shadow-vibrant-dark: 0 20px 50px rgba(2, 8, 20, 0.45);
+  --shadow-glow-blue: 0 0 36px rgba(22, 119, 255, 0.35);
+  --shadow-glow-violet: 0 0 36px rgba(124, 92, 255, 0.35);
+
+  --background: var(--color-white);
+  --foreground: var(--color-navy);
 }
 
 @theme inline {
+  --color-navy: var(--color-navy);
+  --color-navy-deep: var(--color-navy-deep);
+  --color-navy-soft: var(--color-navy-soft);
+  --color-blue: var(--color-blue);
+  --color-blue-soft: var(--color-blue-soft);
+  --color-violet: var(--color-violet);
+  --color-violet-soft: var(--color-violet-soft);
+  --color-teal: var(--color-teal);
+  --color-mist: var(--color-mist);
+  --color-slate: var(--color-slate);
+  --color-whatsapp: var(--color-whatsapp);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
+
+  --animate-fade-up: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-marquee: marquee 32s linear infinite;
+  --animate-fab-pulse: fab-pulse 2.4s ease infinite;
+  --animate-gradient-shift: gradient-shift 12s ease infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes fab-pulse {
+    0%,
+    100% {
+      box-shadow: 0 8px 28px rgba(37, 211, 102, 0.4);
+    }
+    50% {
+      box-shadow: 0 8px 28px rgba(37, 211, 102, 0.7), 0 0 0 10px rgba(37, 211, 102, 0.08);
+    }
+  }
+
+  @keyframes gradient-shift {
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ===== Glassmorphism utilities ===== */
+.glass-dark {
+  background: var(--glass-bg-dark);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border-dark);
+}
+
+.glass-light {
+  background: var(--glass-bg-light);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border-light);
+}
+
+/* A hairline gradient border via padding + mask, independent of background-clip
+   quirks in Safari — used to ring featured cards/buttons. */
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: var(--gradient-primary);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.text-gradient {
+  background: var(--gradient-primary);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.bg-mesh {
+  background-image: var(--gradient-mesh);
+}
+
+* {
+  scrollbar-color: var(--color-slate) transparent;
+}
+
+html {
+  scroll-behavior: auto;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--color-blue);
+  color: white;
+}
+
+.font-display {
+  font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+}
+
+/* Visible focus states for keyboard navigation */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-blue);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* Utility: numeric label style used across sections */
+.eyebrow {
+  letter-spacing: 0.22em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
