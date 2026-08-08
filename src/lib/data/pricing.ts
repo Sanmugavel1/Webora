@@ -15,8 +15,8 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     name: "Standard Package",
     tagline: "For businesses getting online.",
     originalPrice: "₹10,000",
-    price: "₹7,999",
-    gstNote: "+ 18% GST (₹1,440)",
+    price: "₹5,999",
+    gstNote: "+ 18% GST (₹1,080)",
     features: [
       "5 pages website",
       "1 year free domain name (.com / .in / .org)",
@@ -44,8 +44,8 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     badge: "MOST POPULAR",
     tagline: "For businesses ready to build a stronger digital presence.",
     originalPrice: "₹20,000",
-    price: "₹13,999",
-    gstNote: "+ 18% GST (₹2,520)",
+    price: "₹9,999",
+    gstNote: "+ 18% GST (₹1,800)",
     features: [
       "12 pages website",
       "1 year free domain name (.com / .in / .org)",
