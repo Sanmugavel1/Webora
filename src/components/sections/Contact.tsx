@@ -12,7 +12,7 @@ import {
   WHATSAPP_DISPLAY,
   PHONE_TEL,
 } from "@/lib/constants";
-import { PROJECT_TYPES, BUDGET_RANGES } from "@/lib/data/contact";
+import { PROJECT_TYPES } from "@/lib/data/contact";
 
 const inputClasses =
   "w-full min-h-11 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-mist/40 transition-colors focus:border-blue";
@@ -27,7 +27,6 @@ function buildMailtoLink(data: Record<string, string>) {
     `Email: ${data.email || "-"}`,
     `Phone: ${data.phone || "-"}`,
     `Looking for: ${data.projectType || "-"}`,
-    `Budget range: ${data.budget || "-"}`,
     "",
     "Message:",
     data.message || "-",
@@ -156,32 +155,18 @@ export function Contact() {
                   </Field>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                  <Field label="What do you need?" htmlFor="projectType">
-                    <select id="projectType" name="projectType" className={inputClasses} defaultValue="">
-                      <option value="" disabled className="text-navy">
-                        Select an option
+                <Field label="What do you need?" htmlFor="projectType">
+                  <select id="projectType" name="projectType" className={inputClasses} defaultValue="">
+                    <option value="" disabled className="text-navy">
+                      Select an option
+                    </option>
+                    {PROJECT_TYPES.map((type) => (
+                      <option key={type} value={type} className="text-navy">
+                        {type}
                       </option>
-                      {PROJECT_TYPES.map((type) => (
-                        <option key={type} value={type} className="text-navy">
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field label="Budget Range" htmlFor="budget">
-                    <select id="budget" name="budget" className={inputClasses} defaultValue="">
-                      <option value="" disabled className="text-navy">
-                        Select a range
-                      </option>
-                      {BUDGET_RANGES.map((range) => (
-                        <option key={range} value={range} className="text-navy">
-                          {range}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
+                    ))}
+                  </select>
+                </Field>
 
                 <Field label="Message" htmlFor="message">
                   <textarea

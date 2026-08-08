@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Services } from "@/components/sections/Services";
 import { Process } from "@/components/sections/Process";
-import { Portfolio } from "@/components/sections/Portfolio";
 import { CtaBand } from "@/components/sections/CtaBand";
 
 export const metadata: Metadata = {
@@ -29,7 +28,6 @@ export default function ServicesPage() {
       />
       <Services />
       <Process />
-      <Portfolio />
       <CtaBand
         eyebrow="Page 4 of 5"
         heading="SIMPLE PLANS. NO SURPRISES."

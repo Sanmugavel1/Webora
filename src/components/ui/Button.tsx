@@ -23,7 +23,15 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
 };
 
 const baseClasses =
-  "group relative inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold tracking-wide transition-all duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue";
+  "group relative inline-flex min-h-11 items-center justify-center gap-2 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold tracking-wide transition-all duration-300 ease-out focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue";
+
+/** Diagonal light sweep that crosses the button on hover — desktop only. */
+const shine = (
+  <span
+    aria-hidden="true"
+    className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/25 opacity-0 transition-all duration-700 ease-out hover-fine:group-hover:left-[130%] hover-fine:group-hover:opacity-100"
+  />
+);
 
 interface LinkButtonProps extends ButtonBaseProps {
   href: string;
@@ -54,10 +62,11 @@ export function Button({
   const style = variant === "primary" ? { background: "var(--gradient-primary)" } : undefined;
   const content = (
     <>
-      <span>{children}</span>
+      {shine}
+      <span className="relative">{children}</span>
       {showArrow && (
         <ArrowRight
-          className="h-4 w-4 shrink-0 transition-transform duration-300 ease-out group-hover:translate-x-1"
+          className="relative h-4 w-4 shrink-0 transition-transform duration-300 ease-out group-hover:translate-x-1"
           aria-hidden="true"
         />
       )}

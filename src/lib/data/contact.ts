@@ -7,11 +7,3 @@ export const PROJECT_TYPES = [
   "Maintenance",
   "Something Else",
 ] as const;
-
-export const BUDGET_RANGES = [
-  "Not sure yet",
-  "Under $1,000",
-  "$1,000 – $3,000",
-  "$3,000 – $7,000",
-  "$7,000+",
-] as const;

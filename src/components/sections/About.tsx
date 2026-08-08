@@ -16,6 +16,25 @@ export function About() {
 
       <div className="relative mx-auto grid max-w-7xl grid-cols-1 gap-12 px-5 sm:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:px-10">
         <Reveal>
+          {/* Brand mark — the "image representing our startup": the actual
+              WEBORA globe/network mark, presented as a glowing glass badge. */}
+          <div className="relative mb-8 flex h-32 w-32 items-center justify-center sm:h-36 sm:w-36">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full opacity-70 blur-xl motion-safe:animate-[pulse_4s_ease-in-out_infinite]"
+              style={{ background: "var(--gradient-primary)" }}
+            />
+            <div className="glass-dark gradient-border relative flex h-full w-full items-center justify-center rounded-full p-6 shadow-[0_20px_60px_rgba(22,119,255,0.25)] motion-safe:animate-[float_6s_ease-in-out_infinite]">
+              <Image
+                src="/logo-mark.png"
+                alt="The WEBORA network mark"
+                width={200}
+                height={200}
+                className="h-full w-full object-contain"
+              />
+            </div>
+          </div>
+
           <p className="eyebrow mb-4 text-xs font-semibold uppercase text-blue-soft">About</p>
           <h2 className="font-display text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl">
             WHY WE EXIST.
@@ -46,6 +65,13 @@ export function About() {
           </p>
         </Reveal>
       </div>
+
+      <style>{`
+        @keyframes float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-10px); }
+        }
+      `}</style>
     </section>
   );
 }
