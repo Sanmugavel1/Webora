@@ -18,7 +18,7 @@ export default function Home() {
       <SignatureNetwork />
       <About />
       <CtaBand
-        eyebrow="Page 2 of 5"
+        eyebrow="Page 2 of 6"
         heading={
           <>
             MOST WEBSITES DON&rsquo;T FAIL ON DESIGN.

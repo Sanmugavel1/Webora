@@ -15,7 +15,7 @@ export default function ContactPage() {
   return (
     <>
       <PageHeader
-        pageLabel="Page 5 of 5"
+        pageLabel="Page 6 of 6"
         eyebrow="Contact"
         title={
           <>

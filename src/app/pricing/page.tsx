@@ -1,10 +1,34 @@
 import type { Metadata } from "next";
+import { ShieldCheck, Headset, Rocket, Lock } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PricingCard } from "@/components/ui/PricingCard";
 import { Reveal } from "@/components/motion/Reveal";
 import { CtaBand } from "@/components/sections/CtaBand";
 import { PRICING_PACKAGES, NO_DOMAIN_DISCOUNT } from "@/lib/data/pricing";
 import { PHONE_TEL } from "@/lib/constants";
+
+const TRUST_POINTS = [
+  {
+    icon: ShieldCheck,
+    title: "No Hidden Charges",
+    description: "Transparent pricing with no surprises.",
+  },
+  {
+    icon: Headset,
+    title: "Reliable Support",
+    description: "We're here to help you every step of the way.",
+  },
+  {
+    icon: Rocket,
+    title: "Built for Growth",
+    description: "Scalable websites that grow your business.",
+  },
+  {
+    icon: Lock,
+    title: "Secure & Fast",
+    description: "Modern, secure and high-performance websites.",
+  },
+];
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -17,7 +41,7 @@ export default function PricingPage() {
   return (
     <>
       <PageHeader
-        pageLabel="Page 4 of 5"
+        pageLabel="Page 5 of 6"
         eyebrow="Pricing"
         title={
           <>
@@ -37,7 +61,31 @@ export default function PricingPage() {
             ))}
           </div>
 
-          <Reveal className="mt-14 flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-7 text-center sm:flex-row sm:justify-between sm:text-left lg:mt-16">
+          <Reveal className="mt-14 grid grid-cols-1 gap-6 rounded-2xl border border-white/10 bg-white/[0.03] p-7 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4 lg:gap-8">
+            {TRUST_POINTS.map((point) => {
+              const Icon = point.icon;
+              return (
+                <div key={point.title} className="flex items-start gap-3.5">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+                    style={{ background: "var(--gradient-primary)" }}
+                  >
+                    <Icon className="h-4.5 w-4.5" strokeWidth={1.75} />
+                  </div>
+                  <div>
+                    <h3 className="font-display text-sm font-semibold text-white">
+                      {point.title}
+                    </h3>
+                    <p className="mt-1 text-xs leading-relaxed text-mist">
+                      {point.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </Reveal>
+
+          <Reveal className="mt-6 flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-7 text-center sm:flex-row sm:justify-between sm:text-left">
             <div>
               <h3 className="font-display text-lg font-semibold text-white">
                 Already have a domain? Don&rsquo;t need a new one?
@@ -63,7 +111,7 @@ export default function PricingPage() {
       </section>
 
       <CtaBand
-        eyebrow="Page 5 of 5"
+        eyebrow="Page 6 of 6"
         heading="LET'S BUILD SOMETHING GREAT."
         subtext="Tell us about your business and what you need — we'll get back to you with next steps."
         primary={{ label: "GET IN TOUCH", href: "/contact" }}

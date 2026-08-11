@@ -15,7 +15,7 @@ export default function ServicesPage() {
   return (
     <>
       <PageHeader
-        pageLabel="Page 3 of 5"
+        pageLabel="Page 3 of 6"
         eyebrow="What We Do"
         title={
           <>
@@ -29,10 +29,10 @@ export default function ServicesPage() {
       <Services />
       <Process />
       <CtaBand
-        eyebrow="Page 4 of 5"
-        heading="SIMPLE PLANS. NO SURPRISES."
-        subtext="Real pricing, real inclusions, no guesswork — see what it takes to get online."
-        primary={{ label: "SEE PRICING", href: "/pricing" }}
+        eyebrow="Page 4 of 6"
+        heading="MEET THE PEOPLE BUILDING IT."
+        subtext="No account managers, no middle layer — meet the co-founders who build and grow every WEBORA site."
+        primary={{ label: "MEET THE TEAM", href: "/team" }}
         secondary={{ label: "TALK TO US", href: "/contact" }}
       />
     </>

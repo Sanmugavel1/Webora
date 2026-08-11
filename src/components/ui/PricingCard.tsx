@@ -3,7 +3,6 @@ import { Reveal } from "@/components/motion/Reveal";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import { PHONE_TEL } from "@/lib/constants";
 import type { PricingPackage } from "@/lib/data/pricing";
 
 interface PricingCardProps {
@@ -54,12 +53,11 @@ export function PricingCard({ pkg, delay = 0 }: PricingCardProps) {
         <p className="mt-6 text-xs text-white/35">{pkg.footnote}</p>
 
         <Button
-          href={`tel:${PHONE_TEL}`}
+          href="/contact"
           variant="primary"
-          showArrow={false}
           className="mt-6 w-full justify-center"
         >
-          CALL NOW
+          {pkg.ctaLabel}
         </Button>
       </TiltCard>
     </Reveal>

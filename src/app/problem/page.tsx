@@ -16,7 +16,7 @@ export default function ProblemPage() {
   return (
     <>
       <PageHeader
-        pageLabel="Page 2 of 5"
+        pageLabel="Page 2 of 6"
         eyebrow="The Real Problem"
         title={
           <>
@@ -47,7 +47,7 @@ export default function ProblemPage() {
       </section>
 
       <CtaBand
-        eyebrow="Page 3 of 5"
+        eyebrow="Page 3 of 6"
         heading="HERE'S WHAT WE ACTUALLY DO ABOUT IT."
         subtext="A clear look at how Webora turns visibility into trust, and trust into customers."
         primary={{ label: "SEE WHAT WE DO", href: "/services" }}
