@@ -14,6 +14,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
     quote:
       "“We don’t just ship code, we build the engine your business runs on.”",
     bio: "Owns the architecture end to end — from a fast, reliable build to a site that keeps working long after launch.",
+    photo: "/team/sanmugavel.jpg",
   },
   {
     name: "Naveen",
@@ -21,5 +22,6 @@ export const TEAM_MEMBERS: TeamMember[] = [
     quote:
       "“The best websites start with listening — understand the business first, then build.”",
     bio: "The first conversation with every client, making sure what we build actually fits how their business works.",
+    photo: "/team/naveen.jpg",
   },
 ];
