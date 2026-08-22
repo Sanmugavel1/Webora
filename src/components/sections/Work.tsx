@@ -118,32 +118,45 @@ function ProjectCard({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`${project.title} — view live website`}
-        className={cn(
-          "group relative block w-full overflow-hidden rounded-2xl border border-white/10 shadow-[0_20px_50px_rgba(2,8,20,0.4)]",
-          featured ? "aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9]" : "aspect-[4/3] sm:aspect-[16/11]",
-        )}
+        className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-white/10 shadow-[0_20px_50px_rgba(2,8,20,0.4)]"
       >
-        <Image
-          src={project.image}
-          alt={`${project.title} website preview`}
-          fill
-          priority={priority}
-          sizes={featured ? "(min-width: 1024px) 1200px, 100vw" : "(min-width: 768px) 600px, 100vw"}
-          className="object-cover object-top transition-transform duration-700 ease-out hover-fine:group-hover:scale-105"
-        />
-
-        {/* Faint whole-image wash for contrast — the caption itself gets its
-            own solid scrim below, sized to its content, so text is never
-            left legible-but-thin over a bright screenshot underneath it. */}
+        {/*
+          Mobile: image and caption stack in normal flow — the caption's
+          full text (always visible, no hover on touch) can never be taller
+          than the space it's given, so it can never cover the image.
+          Desktop (hover-fine): the caption switches to an absolute overlay
+          pinned to the image's bottom, collapsed to just title/category
+          until hover expands it — the classic case-study card treatment.
+        */}
         <div
-          aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-navy-deep/40 via-transparent to-transparent"
-        />
+          className={cn(
+            "relative w-full shrink-0 overflow-hidden",
+            featured ? "aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9]" : "aspect-[4/3] sm:aspect-[16/11]",
+          )}
+        >
+          <Image
+            src={project.image}
+            alt={`${project.title} website preview`}
+            fill
+            priority={priority}
+            sizes={featured ? "(min-width: 1024px) 1200px, 100vw" : "(min-width: 768px) 600px, 100vw"}
+            className="object-cover object-top transition-transform duration-700 ease-out hover-fine:group-hover:scale-105"
+          />
 
-        {/* Caption scrim — opaque and exactly as tall as the text it holds,
-            so it fully covers the screenshot behind it at any breakpoint
-            (mobile shows the description; desktop reveals it on hover). */}
-        <div className="absolute inset-x-0 bottom-0 bg-navy-deep/95 px-6 pb-6 pt-5 backdrop-blur-sm sm:px-8 sm:pb-8 sm:pt-6">
+          {/* Faint wash under the always-visible desktop peek (title/category)
+              for contrast — invisible on mobile, where nothing sits over the image. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-t from-navy-deep/40 via-transparent to-transparent opacity-0 hover-fine:opacity-100"
+          />
+        </div>
+
+        <div
+          className={cn(
+            "bg-navy-deep px-6 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-6",
+            "hover-fine:absolute hover-fine:inset-x-0 hover-fine:bottom-0 hover-fine:bg-navy-deep/95 hover-fine:backdrop-blur-sm",
+          )}
+        >
           <p className="eyebrow text-[11px] font-semibold uppercase text-blue-soft sm:text-xs">
             {project.category}
           </p>
