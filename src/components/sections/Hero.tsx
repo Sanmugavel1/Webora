@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/motion/Reveal";
 import { CursorGlow } from "@/components/motion/CursorGlow";
+import { ScrollLinkButton } from "@/components/motion/ScrollLinkButton";
 import { NetworkGlobe } from "@/components/three/NetworkGlobe";
 import { InstagramIcon, LinkedinIcon } from "@/components/icons/SocialIcons";
 import { SOCIAL_LINKS } from "@/lib/constants";
@@ -45,9 +46,9 @@ export function Hero() {
               <Button href="/contact" variant="primary">
                 START YOUR PROJECT
               </Button>
-              <Button href="/problem" variant="secondary">
-                SEE THE PROBLEM
-              </Button>
+              <ScrollLinkButton target="#work" variant="secondary">
+                VIEW OUR WORK
+              </ScrollLinkButton>
             </div>
           </Reveal>
 

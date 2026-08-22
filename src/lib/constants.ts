@@ -2,6 +2,7 @@ export const SITE_URL = "https://webora.works";
 
 export const NAV_LINKS = [
   { label: "Home", href: "/" },
+  { label: "Work", href: "/#work" },
   { label: "The Problem", href: "/problem" },
   { label: "What We Do", href: "/services" },
   { label: "Team", href: "/team" },

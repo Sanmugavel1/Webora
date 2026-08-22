@@ -3,6 +3,7 @@ import { Hero } from "@/components/sections/Hero";
 import { WhyWebora } from "@/components/sections/WhyWebora";
 import { SignatureNetwork } from "@/components/sections/SignatureNetwork";
 import { About } from "@/components/sections/About";
+import { Work } from "@/components/sections/Work";
 import { CtaBand } from "@/components/sections/CtaBand";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function Home() {
       <WhyWebora />
       <SignatureNetwork />
       <About />
+      <Work />
       <CtaBand
         eyebrow="Page 2 of 6"
         heading={

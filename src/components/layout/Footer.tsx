@@ -4,6 +4,7 @@ import { InstagramIcon, LinkedinIcon, WhatsAppIcon } from "@/components/icons/So
 import { Logo } from "@/components/ui/Logo";
 import { NAV_LINKS, SOCIAL_LINKS, CONTACT_EMAIL, WHATSAPP_LINK, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { SERVICES } from "@/lib/data/services";
+import { PROJECTS } from "@/lib/data/projects";
 
 export function Footer() {
   return (
@@ -14,7 +15,7 @@ export function Footer() {
         style={{ background: "var(--gradient-primary)" }}
       />
       <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-        <div className="grid grid-cols-1 gap-12 pb-12 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+        <div className="grid grid-cols-1 gap-12 pb-12 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
           <div className="sm:col-span-2 lg:col-span-1">
             <Logo variant="light" />
             <p className="mt-4 max-w-[220px] text-sm leading-relaxed text-mist">
@@ -43,6 +44,20 @@ export function Footer() {
               >
                 {service.title}
               </Link>
+            ))}
+          </FooterColumn>
+
+          <FooterColumn title="Selected Work">
+            {PROJECTS.map((project) => (
+              <a
+                key={project.title}
+                href={project.liveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-9 items-center text-sm text-mist transition-colors hover:text-white"
+              >
+                {project.title}
+              </a>
             ))}
           </FooterColumn>
 

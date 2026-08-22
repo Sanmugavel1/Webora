@@ -6,6 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { WhatsAppFab } from "@/components/layout/WhatsAppFab";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
+import { LaunchScreen } from "@/components/motion/LaunchScreen";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -108,6 +109,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
         />
         <SmoothScroll />
+        <LaunchScreen />
         <Navbar />
         <main>{children}</main>
         <WhatsAppFab />

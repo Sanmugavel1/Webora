@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Lenis from "lenis";
 import { ensureGsapRegistered, gsap, ScrollTrigger } from "@/lib/gsap";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
+import { setLenisInstance } from "@/lib/smooth-scroll";
 
 /**
  * Drives inertia-based smooth scrolling and keeps GSAP ScrollTrigger in sync
@@ -27,8 +28,10 @@ export function SmoothScroll() {
       lenis.raf(time * 1000);
     });
     gsap.ticker.lagSmoothing(0);
+    setLenisInstance(lenis);
 
     return () => {
+      setLenisInstance(null);
       lenis.destroy();
       gsap.ticker.remove(ScrollTrigger.update);
     };

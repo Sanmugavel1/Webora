@@ -8,6 +8,7 @@ import { Logo } from "@/components/ui/Logo";
 import { Button } from "@/components/ui/Button";
 import { NAV_LINKS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { scrollToSelector } from "@/lib/smooth-scroll";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -37,6 +38,20 @@ export function Navbar() {
     };
   }, [menuOpen]);
 
+  // In-page section links (currently just "Work") smooth-scroll instead of
+  // navigating when already on the page they point into — otherwise the
+  // Link falls through to a normal route change and lands on the hash.
+  function handleNavLinkClick(e: React.MouseEvent, href: string) {
+    const hashIndex = href.indexOf("#");
+    if (hashIndex === -1) return;
+    const [path, hash] = [href.slice(0, hashIndex) || "/", href.slice(hashIndex)];
+    if (pathname === path) {
+      e.preventDefault();
+      scrollToSelector(hash);
+      setMenuOpen(false);
+    }
+  }
+
   return (
     <header
       className={cn(
@@ -57,6 +72,7 @@ export function Navbar() {
               <li key={link.href}>
                 <Link
                   href={link.href}
+                  onClick={(e) => handleNavLinkClick(e, link.href)}
                   className={cn(
                     "relative text-sm font-medium transition-colors duration-200",
                     isActive ? "text-white" : "text-mist hover:text-white",
@@ -117,6 +133,7 @@ export function Navbar() {
               >
                 <Link
                   href={link.href}
+                  onClick={(e) => handleNavLinkClick(e, link.href)}
                   className={cn(
                     "font-display flex min-h-14 items-center text-2xl font-semibold",
                     isActive ? "text-gradient" : "text-white",
