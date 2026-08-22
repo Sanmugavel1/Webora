@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { PricingCard } from "@/components/ui/PricingCard";
 import { Reveal } from "@/components/motion/Reveal";
 import { CtaBand } from "@/components/sections/CtaBand";
-import { PRICING_PACKAGES, NO_DOMAIN_DISCOUNT } from "@/lib/data/pricing";
+import { PRICING_PACKAGES } from "@/lib/data/pricing";
 import { PHONE_TEL } from "@/lib/constants";
 
 const TRUST_POINTS = [
@@ -83,23 +83,6 @@ export default function PricingPage() {
                 </div>
               );
             })}
-          </Reveal>
-
-          <Reveal className="mt-6 flex flex-col items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-7 text-center sm:flex-row sm:justify-between sm:text-left">
-            <div>
-              <h3 className="font-display text-lg font-semibold text-white">
-                Already have a domain? Don&rsquo;t need a new one?
-              </h3>
-              <p className="mt-1.5 text-sm text-mist">
-                We&rsquo;ll take {NO_DOMAIN_DISCOUNT} off any package — just mention it when you call.
-              </p>
-            </div>
-            <a
-              href={`tel:${PHONE_TEL}`}
-              className="shrink-0 text-sm font-semibold text-blue-soft transition-colors hover:text-blue"
-            >
-              {PHONE_TEL} →
-            </a>
           </Reveal>
 
           <p className="mx-auto mt-8 max-w-2xl text-center text-xs leading-relaxed text-white/35">

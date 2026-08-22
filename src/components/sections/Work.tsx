@@ -132,13 +132,18 @@ function ProjectCard({
           className="object-cover object-top transition-transform duration-700 ease-out hover-fine:group-hover:scale-105"
         />
 
-        {/* Base overlay — legible on mobile by default, deepens on desktop hover */}
+        {/* Faint whole-image wash for contrast — the caption itself gets its
+            own solid scrim below, sized to its content, so text is never
+            left legible-but-thin over a bright screenshot underneath it. */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-navy-deep via-navy-deep/40 to-transparent opacity-90 transition-opacity duration-500 hover-fine:opacity-60 hover-fine:group-hover:opacity-95"
+          className="absolute inset-0 bg-gradient-to-t from-navy-deep/40 via-transparent to-transparent"
         />
 
-        <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
+        {/* Caption scrim — opaque and exactly as tall as the text it holds,
+            so it fully covers the screenshot behind it at any breakpoint
+            (mobile shows the description; desktop reveals it on hover). */}
+        <div className="absolute inset-x-0 bottom-0 bg-navy-deep/95 px-6 pb-6 pt-5 backdrop-blur-sm sm:px-8 sm:pb-8 sm:pt-6">
           <p className="eyebrow text-[11px] font-semibold uppercase text-blue-soft sm:text-xs">
             {project.category}
           </p>
