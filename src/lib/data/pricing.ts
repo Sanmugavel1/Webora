@@ -54,7 +54,7 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     name: "E-Commerce Website",
     tagline: "For businesses ready to sell online.",
     originalPrice: "",
-    price: "₹14,999+",
+    price: "Custom Quote",
     features: [
       "Everything in Growth",
       "Product catalogue",
