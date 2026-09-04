@@ -1,9 +1,13 @@
 export interface PricingPackage {
+  /** Stable identifier — sent to the server on checkout, never trust the client-side price for the charge amount. */
+  slug: string;
   name: string;
   badge?: string;
   tagline: string;
   originalPrice: string;
   price: string;
+  /** Amount in paise (INR minor unit) for online checkout. Omit for packages without a fixed price (e.g. custom quotes). */
+  amountInPaise?: number;
   features: string[];
   footnote: string;
   ctaLabel: string;
@@ -12,10 +16,12 @@ export interface PricingPackage {
 
 export const PRICING_PACKAGES: PricingPackage[] = [
   {
+    slug: "starter",
     name: "Starter Website",
     tagline: "For businesses getting online.",
     originalPrice: "",
     price: "₹5,999",
+    amountInPaise: 599_900,
     features: [
       "Up to 5 pages",
       "Premium responsive design",
@@ -31,11 +37,13 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     ctaLabel: "GET STARTED",
   },
   {
+    slug: "growth",
     name: "Growth Website",
     badge: "MOST POPULAR",
     tagline: "For businesses ready to build a stronger digital presence.",
     originalPrice: "",
     price: "₹9,999",
+    amountInPaise: 999_900,
     features: [
       "Up to 12 pages",
       "Everything in Starter",
@@ -51,6 +59,7 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     featured: true,
   },
   {
+    slug: "ecommerce",
     name: "E-Commerce Website",
     tagline: "For businesses ready to sell online.",
     originalPrice: "",

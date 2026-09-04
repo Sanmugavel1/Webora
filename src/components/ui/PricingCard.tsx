@@ -2,6 +2,7 @@ import { Check } from "lucide-react";
 import { Reveal } from "@/components/motion/Reveal";
 import { TiltCard } from "@/components/motion/TiltCard";
 import { Button } from "@/components/ui/Button";
+import { CheckoutButton } from "@/components/ui/CheckoutButton";
 import { cn } from "@/lib/utils";
 import type { PricingPackage } from "@/lib/data/pricing";
 
@@ -52,13 +53,17 @@ export function PricingCard({ pkg, delay = 0 }: PricingCardProps) {
 
         <p className="mt-6 text-xs text-white/35">{pkg.footnote}</p>
 
-        <Button
-          href="/contact"
-          variant="primary"
-          className="mt-6 w-full justify-center"
-        >
-          {pkg.ctaLabel}
-        </Button>
+        {pkg.amountInPaise ? (
+          <CheckoutButton slug={pkg.slug} packageName={pkg.name} className="mt-6" />
+        ) : (
+          <Button
+            href="/contact"
+            variant="primary"
+            className="mt-6 w-full justify-center"
+          >
+            {pkg.ctaLabel}
+          </Button>
+        )}
       </TiltCard>
     </Reveal>
   );
