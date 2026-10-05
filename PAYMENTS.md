@@ -1,6 +1,6 @@
 # Payment gateway (Razorpay)
 
-The Starter (₹5,999) and Growth (₹9,999) pricing cards on `/pricing` take a real
+The Starter (₹7,199) and Growth (₹10,999) pricing cards on `/pricing` take a real
 payment via Razorpay Checkout. The E-Commerce card stays as a "Custom Quote"
 enquiry button since it has no fixed price.
 

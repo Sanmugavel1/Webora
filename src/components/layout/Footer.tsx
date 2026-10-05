@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Mail } from "lucide-react";
-import { InstagramIcon, LinkedinIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
+import { InstagramIcon, LinkedinIcon, FacebookIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
 import { Logo } from "@/components/ui/Logo";
 import { NAV_LINKS, SOCIAL_LINKS, CONTACT_EMAIL, WHATSAPP_LINK, WHATSAPP_DISPLAY } from "@/lib/constants";
 import { SERVICES } from "@/lib/data/services";
@@ -95,6 +95,15 @@ export function Footer() {
             >
               <LinkedinIcon className="h-4 w-4" />
               LinkedIn
+            </a>
+            <a
+              href={SOCIAL_LINKS.facebook.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-9 items-center gap-2.5 text-sm text-mist transition-colors hover:text-white"
+            >
+              <FacebookIcon className="h-4 w-4" />
+              Facebook
             </a>
           </FooterColumn>
         </div>

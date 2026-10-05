@@ -3,7 +3,7 @@ import type { SVGProps } from "react";
 /**
  * Lightweight line-style social icons matching lucide's visual language.
  * lucide-react no longer ships brand/logo icons, so these are hand-drawn
- * outline glyphs (not the official Instagram/LinkedIn marks).
+ * outline glyphs (not the official Instagram/LinkedIn/Facebook marks).
  */
 
 export function InstagramIcon({ className, ...props }: SVGProps<SVGSVGElement>) {
@@ -55,6 +55,25 @@ export function LinkedinIcon({ className, ...props }: SVGProps<SVGSVGElement>) {
       <circle cx="7.5" cy="7" r="0.6" fill="currentColor" stroke="none" />
       <path d="M11.5 16.5v-3.6c0-1.3 0.9-2.2 2.1-2.2s1.9 0.9 1.9 2.2v3.6" />
       <line x1="11.5" y1="10.5" x2="11.5" y2="16.5" />
+    </svg>
+  );
+}
+
+export function FacebookIcon({ className, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      {...props}
+    >
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <path d="M15 8h-1.6c-1.1 0-1.9.8-1.9 1.9V21" />
+      <line x1="9.5" y1="13" x2="14.5" y2="13" />
     </svg>
   );
 }

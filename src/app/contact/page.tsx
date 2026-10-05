@@ -7,7 +7,7 @@ import { FAQ } from "@/components/sections/FAQ";
 export const metadata: Metadata = {
   title: "Contact",
   description:
-    "Get in touch with WEBORA — send a project request, call, WhatsApp us, or find us on Instagram and LinkedIn.",
+    "Get in touch with WEBORA — send a project request, call, WhatsApp us, or find us on Instagram, LinkedIn and Facebook.",
   alternates: { canonical: "/contact" },
 };
 

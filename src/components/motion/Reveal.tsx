@@ -15,7 +15,7 @@ interface RevealProps {
 }
 
 /**
- * Fades + lifts its children into place once they scroll into view.
+ * Fades, lifts and un-blurs its children into place once they scroll into view.
  * Fast, GPU-friendly (opacity/transform only) and fully skipped for users
  * who prefer reduced motion.
  */
@@ -36,16 +36,19 @@ export function Reveal({
     const ctx = gsap.context(() => {
       gsap.fromTo(
         ref.current,
-        { opacity: 0, y },
+        { opacity: 0, y, filter: "blur(6px)" },
         {
           opacity: 1,
           y: 0,
-          duration: 0.7,
+          filter: "blur(0px)",
+          duration: 0.9,
           delay,
-          ease: "power3.out",
+          ease: "expo.out",
+          // Drop the filter once settled so it can't soften text or cost GPU time.
+          clearProps: "filter",
           scrollTrigger: {
             trigger: ref.current,
-            start: "top 85%",
+            start: "top 88%",
             once: true,
           },
         },

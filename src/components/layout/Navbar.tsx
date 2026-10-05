@@ -74,18 +74,19 @@ export function Navbar() {
                   href={link.href}
                   onClick={(e) => handleNavLinkClick(e, link.href)}
                   className={cn(
-                    "relative text-sm font-medium transition-colors duration-200",
+                    "group relative text-sm font-medium transition-colors duration-200",
                     isActive ? "text-white" : "text-mist hover:text-white",
                   )}
                 >
                   {link.label}
-                  {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -bottom-2 left-0 h-[2px] w-full rounded-full"
-                      style={{ background: "var(--gradient-primary)" }}
-                    />
-                  )}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute -bottom-2 left-0 h-[2px] w-full origin-left rounded-full transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                      isActive ? "scale-x-100" : "scale-x-0 hover-fine:group-hover:scale-x-100",
+                    )}
+                    style={{ background: "var(--gradient-primary)" }}
+                  />
                 </Link>
               </li>
             );

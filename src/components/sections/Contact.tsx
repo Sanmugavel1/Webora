@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { CheckCircle2, Mail, Phone } from "lucide-react";
-import { InstagramIcon, LinkedinIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
+import { InstagramIcon, LinkedinIcon, FacebookIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/motion/Reveal";
 import {
@@ -106,6 +106,15 @@ export function Contact() {
               >
                 <LinkedinIcon className="h-5 w-5" />
                 {SOCIAL_LINKS.linkedin.label}
+              </a>
+              <a
+                href={SOCIAL_LINKS.facebook.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-11 items-center gap-3 text-sm font-medium text-white transition-colors hover:text-blue-soft"
+              >
+                <FacebookIcon className="h-5 w-5" />
+                {SOCIAL_LINKS.facebook.label}
               </a>
             </div>
           </Reveal>

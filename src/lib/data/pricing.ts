@@ -20,8 +20,8 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     name: "Starter Website",
     tagline: "For businesses getting online.",
     originalPrice: "",
-    price: "₹5,999",
-    amountInPaise: 599_900,
+    price: "₹7,199",
+    amountInPaise: 719_900,
     features: [
       "Up to 5 pages",
       "Premium responsive design",
@@ -42,8 +42,8 @@ export const PRICING_PACKAGES: PricingPackage[] = [
     badge: "MOST POPULAR",
     tagline: "For businesses ready to build a stronger digital presence.",
     originalPrice: "",
-    price: "₹9,999",
-    amountInPaise: 999_900,
+    price: "₹10,999",
+    amountInPaise: 1_099_900,
     features: [
       "Up to 12 pages",
       "Everything in Starter",

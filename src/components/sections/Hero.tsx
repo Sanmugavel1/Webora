@@ -3,7 +3,7 @@ import { Reveal } from "@/components/motion/Reveal";
 import { CursorGlow } from "@/components/motion/CursorGlow";
 import { ScrollLinkButton } from "@/components/motion/ScrollLinkButton";
 import { NetworkGlobe } from "@/components/three/NetworkGlobe";
-import { InstagramIcon, LinkedinIcon } from "@/components/icons/SocialIcons";
+import { InstagramIcon, LinkedinIcon, FacebookIcon } from "@/components/icons/SocialIcons";
 import { SOCIAL_LINKS } from "@/lib/constants";
 
 export function Hero() {
@@ -74,6 +74,15 @@ export function Hero() {
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-all duration-300 hover-fine:hover:scale-110 hover-fine:hover:border-blue-soft/60 hover-fine:hover:text-blue-soft"
               >
                 <LinkedinIcon className="h-4 w-4" />
+              </a>
+              <a
+                href={SOCIAL_LINKS.facebook.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WEBORA on Facebook"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition-all duration-300 hover-fine:hover:scale-110 hover-fine:hover:border-blue-soft/60 hover-fine:hover:text-blue-soft"
+              >
+                <FacebookIcon className="h-4 w-4" />
               </a>
             </div>
           </Reveal>

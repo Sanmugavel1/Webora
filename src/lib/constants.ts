@@ -17,7 +17,11 @@ export const SOCIAL_LINKS = {
   },
   linkedin: {
     label: "Webora Works",
-    href: "https://www.linkedin.com/in/webora-a-059761428/",
+    href: "https://www.linkedin.com/in/webora-web-059761428/",
+  },
+  facebook: {
+    label: "Webora",
+    href: "https://www.facebook.com/share/198mXgiod1/",
   },
 } as const;
 

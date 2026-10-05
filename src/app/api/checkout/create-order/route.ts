@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const pkg = PURCHASABLE_PACKAGES.find((p) => p.slug === slug);
 
   // The charge amount always comes from our own pricing data, never from the client —
-  // a tampered request could otherwise ask us to charge ₹1 for a ₹9,999 package.
+  // a tampered request could otherwise ask us to charge ₹1 for a ₹10,999 package.
   if (!pkg || !pkg.amountInPaise) {
     return NextResponse.json(
       { error: "Unknown or non-purchasable package." },

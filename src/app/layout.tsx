@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer";
 import { WhatsAppFab } from "@/components/layout/WhatsAppFab";
 import { SmoothScroll } from "@/components/motion/SmoothScroll";
 import { LaunchScreen } from "@/components/motion/LaunchScreen";
+import { ScrollProgress } from "@/components/motion/ScrollProgress";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -93,7 +94,7 @@ const ORGANIZATION_JSON_LD = {
   slogan: "We Build Websites That Grow Brands",
   url: SITE_URL,
   email: "webora99@gmail.com",
-  sameAs: [SOCIAL_LINKS.instagram.href, SOCIAL_LINKS.linkedin.href],
+  sameAs: [SOCIAL_LINKS.instagram.href, SOCIAL_LINKS.linkedin.href, SOCIAL_LINKS.facebook.href],
   areaServed: "IN",
 };
 
@@ -110,6 +111,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <SmoothScroll />
         <LaunchScreen />
+        <ScrollProgress />
         <Navbar />
         <main>{children}</main>
         <WhatsAppFab />
