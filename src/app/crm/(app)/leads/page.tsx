@@ -3,14 +3,20 @@ import { Download, Search } from "lucide-react";
 import { listUsers, requireUser } from "@/lib/crm/auth";
 import { q } from "@/lib/crm/db";
 import { LEAD_SELECT, type Lead } from "@/lib/crm/engine";
-import { SOURCES, STAGES, sourceLabel } from "@/lib/crm/config";
-import { fmtDate, inr, timeAgo } from "@/lib/crm/format";
-import { Empty, PageTitle, StageBadge } from "@/components/crm/ui";
+import { leadWhere } from "@/lib/crm/leadQuery";
+import { channelStatus } from "@/lib/crm/messaging";
+import { SOURCES, STAGES } from "@/lib/crm/config";
+import { Empty, PageTitle } from "@/components/crm/ui";
+import { LeadsTable } from "@/components/crm/LeadsTable";
 import { LeadFields } from "@/components/crm/LeadFields";
 import { ImportCsv } from "@/components/crm/ImportCsv";
 import { createLeadAction } from "../../actions";
 
 export const metadata = { title: "Leads" };
+// CSV import batches and bulk scheduling run as server actions on this page.
+export const maxDuration = 60;
+
+const PAGE_SIZE = 100;
 
 export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads">) {
   await requireUser();
@@ -22,28 +28,32 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
   const tag = one(sp.tag);
   const sort = one(sp.sort) || "recent";
 
-  const where: string[] = [];
-  const params: unknown[] = [];
-  if (term) {
-    params.push(`%${term.toLowerCase()}%`);
-    where.push(`(lower(l.name) LIKE $${params.length} OR lower(l.business) LIKE $${params.length} OR lower(l.email) LIKE $${params.length} OR l.phone LIKE $${params.length})`);
-  }
-  if (stage) { params.push(stage); where.push(`l.stage = $${params.length}`); }
-  if (source) { params.push(source); where.push(`l.source = $${params.length}`); }
-  if (tag) { params.push(tag); where.push(`$${params.length} = ANY(l.tags)`); }
+  const page = Math.max(1, Number(one(sp.page)) || 1);
+  const w = leadWhere({ q: term, stage, source, tag });
   const order = { recent: "l.created_at DESC", updated: "l.updated_at DESC", value: "l.value DESC", followup: "l.next_followup_at ASC NULLS LAST" }[sort] ?? "l.created_at DESC";
 
-  const [leads, users] = await Promise.all([
-    q<Lead>(`${LEAD_SELECT} ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY ${order} LIMIT 500`, params),
+  const [leads, countRow, users, emailTemplates] = await Promise.all([
+    q<Lead>(`${LEAD_SELECT} ${w.sql} ORDER BY ${order}, l.id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, w.params),
+    q<{ n: number }>(`SELECT count(*)::int AS n FROM crm_leads l ${w.sql}`, w.params),
     listUsers(),
+    q<{ id: number; name: string; subject: string; body: string }>("SELECT id, name, subject, body FROM crm_templates WHERE channel = 'email' ORDER BY name"),
   ]);
+  const total = countRow[0]?.n ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageHref = (p: number) => {
+    const u = new URLSearchParams();
+    for (const [k, v] of Object.entries({ q: term, stage, source, tag, sort: sort === "recent" ? "" : sort })) if (v) u.set(k, v);
+    if (p > 1) u.set("page", String(p));
+    const qs = u.toString();
+    return `/crm/leads${qs ? `?${qs}` : ""}`;
+  };
   const filtered = Boolean(term || stage || source || tag);
 
   return (
     <>
       <PageTitle
         title="Leads"
-        sub={`${leads.length} ${filtered ? "matching" : "total"}`}
+        sub={`${total.toLocaleString("en-IN")} ${filtered ? "matching" : "total"}${pages > 1 ? ` · page ${page} of ${pages}` : ""} · tick leads to schedule an email`}
         actions={
           <>
             <ImportCsv />
@@ -91,49 +101,26 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
         <Empty>{filtered ? "No leads match those filters." : "No leads yet — website enquiries will appear here automatically, or add one above."}</Empty>
       ) : (
         <>
-          <div className="crm-card hidden overflow-x-auto md:block">
-            <table className="crm-table">
-              <thead>
-                <tr><th>Lead</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th></tr>
-              </thead>
-              <tbody>
-                {leads.map((l) => (
-                  <tr key={l.id}>
-                    <td>
-                      <Link href={`/crm/leads/${l.id}`} className="font-medium hover:underline">{l.name}</Link>
-                      <div className="text-xs text-[var(--crm-ink-3)]">{[l.business, l.phone].filter(Boolean).join(" · ") || l.email}</div>
-                      {l.tags.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {l.tags.map((t) => <Link key={t} href={`/crm/leads?tag=${encodeURIComponent(t)}`} className="rounded bg-white/5 px-1.5 text-[10px] text-[var(--crm-ink-2)]">#{t}</Link>)}
-                        </div>
-                      )}
-                    </td>
-                    <td><StageBadge stage={l.stage} /></td>
-                    <td className="text-[var(--crm-ink-2)]">{l.service || "—"}</td>
-                    <td className="text-[var(--crm-ink-2)]">{sourceLabel(l.source)}</td>
-                    <td className="text-right tabular-nums">{l.value ? inr(l.value) : "—"}</td>
-                    <td className={l.next_followup_at && new Date(l.next_followup_at) < new Date() ? "text-amber-300" : "text-[var(--crm-ink-2)]"}>{fmtDate(l.next_followup_at, true)}</td>
-                    <td className="text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <ul className="space-y-2 md:hidden">
-            {leads.map((l) => (
-              <li key={l.id}>
-                <Link href={`/crm/leads/${l.id}`} className="crm-card flex items-start gap-3 p-4">
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{l.name}</span>
-                    <span className="block truncate text-xs text-[var(--crm-ink-3)]">{[l.business, l.service].filter(Boolean).join(" · ") || "—"}</span>
-                    <span className="mt-2 flex items-center gap-2"><StageBadge stage={l.stage} />{l.value > 0 && <span className="text-xs tabular-nums">{inr(l.value)}</span>}</span>
-                  </span>
-                  <span className="text-xs text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <LeadsTable
+            key={`${page}-${term}-${stage}-${source}-${tag}-${sort}`}
+            leads={leads.map((l) => ({
+              id: l.id, name: l.name, business: l.business, email: l.email, phone: l.phone, service: l.service, source: l.source,
+              stage: l.stage, value: l.value, tags: l.tags, agent_name: l.agent_name,
+              next_followup_at: l.next_followup_at ? new Date(l.next_followup_at).toISOString() : null,
+              created_at: new Date(l.created_at).toISOString(),
+            }))}
+            total={total}
+            filter={{ q: term, stage, source, tag }}
+            emailTemplates={emailTemplates}
+            emailReady={channelStatus().email}
+          />
+          {pages > 1 && (
+            <nav className="mt-4 flex items-center justify-center gap-2 text-sm" aria-label="Pages">
+              {page > 1 ? <Link href={pageHref(page - 1)} className="crm-btn crm-btn-ghost crm-btn-sm">← Previous</Link> : <span className="crm-btn crm-btn-ghost crm-btn-sm opacity-40">← Previous</span>}
+              <span className="px-2 text-[var(--crm-ink-3)]">Page {page} of {pages}</span>
+              {page < pages ? <Link href={pageHref(page + 1)} className="crm-btn crm-btn-ghost crm-btn-sm">Next →</Link> : <span className="crm-btn crm-btn-ghost crm-btn-sm opacity-40">Next →</span>}
+            </nav>
+          )}
         </>
       )}
     </>

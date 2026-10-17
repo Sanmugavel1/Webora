@@ -1,5 +1,5 @@
 import "server-only";
-import { q, q1 } from "./db";
+import { q, q1, tx } from "./db";
 import { STAGE_IDS, stageOf, type SequenceStep, type StageId } from "./config";
 import { channelStatus, renderTemplate, sendEmail, sendWhatsAppApi } from "./messaging";
 
@@ -201,10 +201,12 @@ const STATUS_WORDS = { sent: "sent", queued: "ready in Outbox to send", failed: 
  * team member opens the CRM, and right after a new lead arrives — so day-0
  * replies go out instantly without needing a frequent cron.
  */
-export async function runDueFollowups(opts: { leadId?: number; limit?: number } = {}) {
+export async function runDueFollowups(opts: { leadId?: number; limit?: number; deadline?: number } = {}) {
   let processed = 0;
-  // Several steps can be due at once (e.g. two "day 0" steps), so loop.
+  // Several steps can be due at once (e.g. two "day 0" steps), so loop — but
+  // stop at the deadline so a big backlog drains over several ticks instead of one slow request.
   for (let pass = 0; pass < 10; pass++) {
+    if (opts.deadline && Date.now() > opts.deadline) break;
     const claimed = await q<{ id: number; lead_id: number; sequence_id: number; step_index: number; enrolled_at: Date }>(
       `UPDATE crm_enrollments SET next_run_at = now() + interval '10 minutes'
        WHERE id IN (
@@ -212,7 +214,7 @@ export async function runDueFollowups(opts: { leadId?: number; limit?: number } 
          WHERE status = 'active' AND next_run_at <= now() AND ($1::int IS NULL OR lead_id = $1)
          ORDER BY next_run_at LIMIT $2 FOR UPDATE SKIP LOCKED
        ) RETURNING id, lead_id, sequence_id, step_index, enrolled_at`,
-      [opts.leadId ?? null, opts.limit ?? 40],
+      [opts.leadId ?? null, opts.limit ?? 20],
     );
     if (claimed.length === 0) break;
 
@@ -261,4 +263,192 @@ export async function runDueFollowups(opts: { leadId?: number; limit?: number } 
     }
   }
   return processed;
+}
+
+export type ImportRow = {
+  name: string;
+  business: string;
+  email: string;
+  phone: string;
+  service: string;
+  source: string;
+  value: number;
+  tags: string[];
+  notes: string;
+};
+
+/**
+ * Bulk version of createOrMergeLead for CSV imports: a whole batch costs a
+ * handful of queries instead of ~7 per row, so hundreds of rows fit easily in
+ * one request. Duplicates (same email/phone) inside the file or already in the
+ * CRM are merged, exactly like single leads.
+ */
+export async function importLeads(rows: ImportRow[], opts: { userId: number; startFollowups: boolean }) {
+  let merged = 0;
+  const seen = new Map<string, number>();
+  const uniq: ImportRow[] = [];
+  for (const raw of rows) {
+    const r = {
+      ...raw,
+      name: raw.name.trim(),
+      business: raw.business.trim(),
+      email: raw.email.trim().toLowerCase(),
+      phone: raw.phone.replace(/[^\d+]/g, ""),
+      service: raw.service.trim(),
+      notes: raw.notes.trim(),
+      source: raw.source.trim() || "manual",
+      value: Math.max(0, Math.round(raw.value || 0)),
+    };
+    if (!r.name) continue;
+    const keys = [r.email && `e:${r.email}`, r.phone && `p:${r.phone}`].filter(Boolean) as string[];
+    const hit = keys.map((k) => seen.get(k)).find((i) => i !== undefined);
+    if (hit !== undefined) {
+      const u = uniq[hit];
+      u.business ||= r.business;
+      u.email ||= r.email;
+      u.phone ||= r.phone;
+      u.service ||= r.service;
+      keys.forEach((k) => seen.set(k, hit));
+      merged++;
+      continue;
+    }
+    keys.forEach((k) => seen.set(k, uniq.length));
+    uniq.push(r);
+  }
+  if (uniq.length === 0) return { created: 0, merged };
+
+  return tx(async (c) => {
+    const existing = (
+      await c.query<{ id: number; email: string; phone: string }>(
+        "SELECT id, lower(email) AS email, phone FROM crm_leads WHERE lower(email) = ANY($1::text[]) OR phone = ANY($2::text[]) ORDER BY id",
+        [uniq.map((r) => r.email).filter(Boolean), uniq.map((r) => r.phone).filter(Boolean)],
+      )
+    ).rows;
+    const byEmail = new Map<string, number>();
+    const byPhone = new Map<string, number>();
+    for (const e of existing) {
+      if (e.email && !byEmail.has(e.email)) byEmail.set(e.email, e.id);
+      if (e.phone && !byPhone.has(e.phone)) byPhone.set(e.phone, e.id);
+    }
+
+    const fresh: ImportRow[] = [];
+    const matches: (ImportRow & { id: number })[] = [];
+    for (const r of uniq) {
+      const id = (r.email && byEmail.get(r.email)) || (r.phone && byPhone.get(r.phone));
+      if (id) matches.push({ ...r, id });
+      else fresh.push(r);
+    }
+
+    if (matches.length) {
+      await c.query(
+        `UPDATE crm_leads l SET
+           business = CASE WHEN l.business = '' THEN x.business ELSE l.business END,
+           email = CASE WHEN l.email = '' THEN x.email ELSE l.email END,
+           phone = CASE WHEN l.phone = '' THEN x.phone ELSE l.phone END,
+           service = CASE WHEN x.service <> '' THEN x.service ELSE l.service END,
+           updated_at = now()
+         FROM jsonb_to_recordset($1::jsonb) AS x(id int, business text, email text, phone text, service text)
+         WHERE l.id = x.id`,
+        [JSON.stringify(matches)],
+      );
+      await c.query(
+        `INSERT INTO crm_activities (lead_id, user_id, type, body)
+         SELECT x.id, $2, 'enquiry', 'Matched again in a CSV import' || CASE WHEN x.service <> '' THEN ' (' || x.service || ')' ELSE '' END
+         FROM jsonb_to_recordset($1::jsonb) AS x(id int, service text)`,
+        [JSON.stringify(matches), opts.userId],
+      );
+    }
+
+    if (fresh.length) {
+      const inserted = (
+        await c.query<{ id: number; source: string }>(
+          `INSERT INTO crm_leads (name, business, email, phone, service, source, value, tags, notes, assigned_to)
+           SELECT x.name, x.business, x.email, x.phone, x.service, x.source, x.value,
+                  ARRAY(SELECT jsonb_array_elements_text(x.tags)), x.notes, $2
+           FROM jsonb_to_recordset($1::jsonb) AS x(name text, business text, email text, phone text, service text, source text, value int, tags jsonb, notes text)
+           RETURNING id, source`,
+          [JSON.stringify(fresh), opts.userId],
+        )
+      ).rows;
+      await c.query(
+        `INSERT INTO crm_activities (lead_id, user_id, type, body)
+         SELECT id, $3, 'created', 'Lead created from ' || src || ' (CSV import)' FROM unnest($1::int[], $2::text[]) AS t(id, src)`,
+        [inserted.map((r) => r.id), inserted.map((r) => r.source), opts.userId],
+      );
+
+      if (opts.startFollowups) {
+        const seqs = (
+          await c.query<{ id: number; name: string; trigger: string; first_day: number }>(
+            `SELECT id, name, trigger, COALESCE((steps->0->>'day')::int, 0) AS first_day FROM crm_sequences
+             WHERE active AND trigger IN ('new_lead', 'manual') AND jsonb_array_length(steps) > 0`,
+          )
+        ).rows;
+        for (const s of seqs) {
+          // Same rule as createOrMergeLead: "manual" sequences only pick up leads without a channel source.
+          const ids = inserted.filter((r) => s.trigger === "new_lead" || r.source === "manual").map((r) => r.id);
+          if (!ids.length) continue;
+          const enrolled = (
+            await c.query<{ lead_id: number }>(
+              `INSERT INTO crm_enrollments (lead_id, sequence_id, next_run_at)
+               SELECT unnest($1::int[]), $2, now() + make_interval(days => $3)
+               ON CONFLICT (lead_id, sequence_id) DO NOTHING RETURNING lead_id`,
+              [ids, s.id, s.first_day],
+            )
+          ).rows;
+          await c.query(
+            "INSERT INTO crm_activities (lead_id, user_id, type, body) SELECT unnest($1::int[]), $2, 'automation', $3",
+            [enrolled.map((r) => r.lead_id), opts.userId, `Started follow-up sequence “${s.name}”`],
+          );
+        }
+      }
+    }
+    return { created: fresh.length, merged: merged + matches.length };
+  });
+}
+
+/** Sends emails scheduled from the Leads page once their time comes (needs Gmail SMTP). */
+export async function runScheduledEmails(opts: { deadline?: number } = {}) {
+  if (!channelStatus().email) return 0;
+  let sent = 0;
+  for (let pass = 0; pass < 20; pass++) {
+    if (opts.deadline && Date.now() > opts.deadline) break;
+    // Claim a small batch; if this run dies mid-way the claim expires and another tick retries.
+    const batch = await q<{ id: number; lead_id: number; to_addr: string; subject: string; body: string }>(
+      `UPDATE crm_messages SET scheduled_for = now() + interval '10 minutes'
+       WHERE id IN (
+         SELECT id FROM crm_messages WHERE status = 'scheduled' AND scheduled_for <= now()
+         ORDER BY scheduled_for LIMIT 10 FOR UPDATE SKIP LOCKED
+       ) RETURNING id, lead_id, to_addr, subject, body`,
+    );
+    if (batch.length === 0) break;
+    for (const m of batch) {
+      try {
+        await sendEmail(m.to_addr, m.subject, m.body);
+        await q("UPDATE crm_messages SET status = 'sent', sent_at = now(), error = '' WHERE id = $1", [m.id]);
+        await logActivity(m.lead_id, "email", `Scheduled email “${m.subject}” sent to ${m.to_addr}`);
+        const lead = await q1<{ stage: StageId }>("SELECT stage FROM crm_leads WHERE id = $1", [m.lead_id]);
+        if (lead?.stage === "new") await changeStage(m.lead_id, "contacted", null);
+        sent++;
+      } catch (e) {
+        await q("UPDATE crm_messages SET status = 'failed', error = $2 WHERE id = $1", [m.id, (e as Error).message]);
+        await logActivity(m.lead_id, "email", `Scheduled email “${m.subject}” failed (${(e as Error).message})`);
+      }
+    }
+  }
+  return sent;
+}
+
+const tickState = globalThis as unknown as { crmTickAt?: number };
+
+/**
+ * One time-boxed automation pass. Pages call this *after* responding (via
+ * next/server `after`), so opening the CRM never waits on sending messages.
+ */
+export async function automationTick(budgetMs = 15_000) {
+  const now = Date.now();
+  if (tickState.crmTickAt && now - tickState.crmTickAt < 20_000) return;
+  tickState.crmTickAt = now;
+  const deadline = now + budgetMs;
+  await runScheduledEmails({ deadline });
+  await runDueFollowups({ deadline });
 }

@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS crm_activities (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS crm_activities_lead_idx ON crm_activities(lead_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS crm_activities_recent_idx ON crm_activities(created_at DESC);
 
 CREATE TABLE IF NOT EXISTS crm_templates (
   id SERIAL PRIMARY KEY,
@@ -109,6 +110,10 @@ CREATE TABLE IF NOT EXISTS crm_messages (
   sent_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS crm_messages_status_idx ON crm_messages(status, created_at DESC);
+-- Emails scheduled from the Leads page wait here (status 'scheduled') until scheduled_for.
+ALTER TABLE crm_messages ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS crm_messages_lead_idx ON crm_messages(lead_id);
+CREATE INDEX IF NOT EXISTS crm_messages_scheduled_idx ON crm_messages(scheduled_for) WHERE status = 'scheduled';
 
 CREATE TABLE IF NOT EXISTS crm_tasks (
   id SERIAL PRIMARY KEY,

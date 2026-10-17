@@ -9,7 +9,7 @@ export function PageTitle({ title, sub, actions }: { title: string; sub?: string
         <h1 className="font-display text-2xl font-bold tracking-tight sm:text-[1.7rem]">{title}</h1>
         {sub && <p className="mt-1 text-sm text-[var(--crm-ink-3)]">{sub}</p>}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+      {actions && <div className="flex flex-wrap items-start gap-2">{actions}</div>}
     </div>
   );
 }

@@ -13,6 +13,8 @@
   color-scheme: dark;
 }
 
+/* Component classes live in the components layer so Tailwind utilities (w-auto, pl-9…) can override them. */
+@layer components {
 .crm-card {
   background: var(--crm-panel);
   border: 1px solid var(--crm-line);
@@ -75,3 +77,4 @@
 .crm details > summary::-webkit-details-marker { display: none; }
 
 .crm-kanban-col[data-over="true"] { outline: 2px dashed var(--color-blue); outline-offset: -4px; }
+}

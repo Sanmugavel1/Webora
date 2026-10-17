@@ -8,7 +8,7 @@ import { inr, timeAgo } from "@/lib/crm/format";
 
 type Card = { id: number; name: string; business: string; service: string; value: number; stage: StageId; stage_changed_at: string; agent_name: string | null; next_followup_at: string | null };
 
-export function Kanban({ leads }: { leads: Card[] }) {
+export function Kanban({ leads, stats }: { leads: Card[]; stats: Record<string, { n: number; total: number }> }) {
   const [items, move] = useOptimistic(leads, (state, { id, stage }: { id: number; stage: StageId }) =>
     state.map((l) => (l.id === id ? { ...l, stage } : l)),
   );
@@ -28,7 +28,11 @@ export function Kanban({ leads }: { leads: Card[] }) {
       <div className="grid min-w-[1080px] grid-cols-6 gap-3">
         {STAGES.map((s) => {
           const col = items.filter((l) => l.stage === s.id);
-          const total = col.reduce((a, l) => a + l.value, 0);
+          // Server totals cover the whole column; adjust for cards moved on this page.
+          const shown = leads.filter((l) => l.stage === s.id);
+          const count = (stats[s.id]?.n ?? 0) + col.length - shown.length;
+          const total = (stats[s.id]?.total ?? 0) + col.reduce((a, l) => a + l.value, 0) - shown.reduce((a, l) => a + l.value, 0);
+          const hidden = count - col.length;
           return (
             <section
               key={s.id}
@@ -43,7 +47,7 @@ export function Kanban({ leads }: { leads: Card[] }) {
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
                   {s.label}
-                  <span className="text-xs font-normal text-[var(--crm-ink-3)]">{col.length}</span>
+                  <span className="text-xs font-normal text-[var(--crm-ink-3)]">{count}</span>
                 </span>
                 {total > 0 && <span className="text-xs tabular-nums text-[var(--crm-ink-3)]">{inr(total)}</span>}
               </header>
@@ -75,6 +79,11 @@ export function Kanban({ leads }: { leads: Card[] }) {
                     </select>
                   </article>
                 ))}
+                {hidden > 0 && (
+                  <Link href={`/crm/leads?stage=${s.id}`} className="rounded-lg border border-dashed border-[var(--crm-line)] p-2 text-center text-xs text-[var(--crm-ink-3)] hover:bg-white/5">
+                    + {hidden.toLocaleString("en-IN")} more in Leads
+                  </Link>
+                )}
               </div>
             </section>
           );

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Upload } from "lucide-react";
-import { importLeadsAction } from "@/app/crm/actions";
+import { finishImportAction, importLeadsAction } from "@/app/crm/actions";
 
 /** RFC-4180-ish CSV parse — enough for spreadsheets exported from Excel/Sheets. */
 function parseCsv(text: string) {
@@ -33,30 +34,71 @@ const ALIASES: Record<string, string> = {
   "project": "service", "looking for": "service", "amount": "value", "deal value": "value", "note": "notes",
 };
 
+const BATCH = 100;
+
 export function ImportCsv() {
+  const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState("");
-  const [pending, start] = useTransition();
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [followups, setFollowups] = useState(true);
 
   async function onFile(file: File) {
-    const [head, ...body] = parseCsv(await file.text());
+    setMsg("");
+    const [head, ...body] = parseCsv((await file.text()).replace(/^\uFEFF/, ""));
     if (!head) return setMsg("That file looks empty.");
     const keys = head.map((h) => { const k = h.trim().toLowerCase(); return ALIASES[k] ?? k; });
     if (!keys.includes("name")) return setMsg("Need a “name” column (plus phone/email, business, service…).");
     const rows = body.map((r) => Object.fromEntries(keys.map((k, i) => [k, r[i] ?? ""])));
-    start(async () => {
-      const res = await importLeadsAction(rows);
-      setMsg(`Imported ${res.created} new lead${res.created === 1 ? "" : "s"}${res.merged ? `, ${res.merged} matched existing` : ""}.`);
-    });
+
+    // Small batches, one after another: each request stays quick, a slow
+    // network can't time out the whole file, and progress is visible.
+    let created = 0, merged = 0, failed = 0;
+    setProgress({ done: 0, total: rows.length });
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const chunk = rows.slice(i, i + BATCH);
+      let ok = false;
+      for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+        try {
+          const res = await importLeadsAction(chunk, followups);
+          created += res.created;
+          merged += res.merged;
+          ok = true;
+        } catch {
+          await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+        }
+      }
+      if (!ok) failed += chunk.length;
+      setProgress({ done: Math.min(i + BATCH, rows.length), total: rows.length });
+    }
+    await finishImportAction().catch(() => {});
+    setProgress(null);
+    setMsg(
+      `Imported ${created} new lead${created === 1 ? "" : "s"}${merged ? `, ${merged} matched existing` : ""}` +
+        (failed ? ` — ${failed} row${failed === 1 ? "" : "s"} couldn’t be saved (network?), try importing the file again; duplicates are merged.` : "."),
+    );
+    router.refresh();
   }
 
+  const busy = progress !== null;
   return (
-    <>
+    <div className="flex flex-col items-end gap-1.5">
       <input ref={input} type="file" accept=".csv,text/csv" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ""; }} />
-      <button type="button" disabled={pending} onClick={() => input.current?.click()} className="crm-btn crm-btn-ghost" title="Columns: name, phone, email, business, service, source, value, tags, notes">
-        <Upload className="h-4 w-4" /> {pending ? "Importing…" : "Import CSV"}
-      </button>
-      {msg && <p className="w-full text-right text-xs text-[var(--crm-ink-2)]">{msg}</p>}
-    </>
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-1.5 text-xs text-[var(--crm-ink-2)]" title="Puts imported leads into your active “new lead” follow-up sequences">
+          <input type="checkbox" checked={followups} disabled={busy} onChange={(e) => setFollowups(e.target.checked)} className="accent-[var(--color-blue)]" />
+          Start follow-ups
+        </label>
+        <button type="button" disabled={busy} onClick={() => input.current?.click()} className="crm-btn crm-btn-ghost" title="Columns: name, phone, email, business, service, source, value, tags, notes">
+          <Upload className="h-4 w-4" /> {busy ? `Importing ${progress.done} / ${progress.total}…` : "Import CSV"}
+        </button>
+      </div>
+      {busy && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={progress.done} aria-valuemax={progress.total}>
+          <div className="h-full rounded-full bg-[var(--color-blue)] transition-[width] duration-300" style={{ width: `${(progress.done / Math.max(1, progress.total)) * 100}%` }} />
+        </div>
+      )}
+      {msg && <p className="max-w-xs text-right text-xs text-[var(--crm-ink-2)]">{msg}</p>}
+    </div>
   );
 }

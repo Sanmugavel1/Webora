@@ -1,12 +1,14 @@
+import { after } from "next/server";
 import { requireUser } from "@/lib/crm/auth";
 import { q1 } from "@/lib/crm/db";
-import { runDueFollowups } from "@/lib/crm/engine";
+import { automationTick } from "@/lib/crm/engine";
 import { Sidebar } from "@/components/crm/Sidebar";
 
 export default async function CrmAppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
-  // Opening the CRM doubles as a scheduler tick, so follow-ups never wait for the daily cron.
-  await runDueFollowups().catch((e) => console.error("followup run failed", e));
+  // Opening the CRM doubles as a scheduler tick, so follow-ups never wait for the cron —
+  // but it runs after the page is sent, so a backlog can never make the page hang.
+  after(() => automationTick().catch((e) => console.error("automation tick failed", e)));
   const outbox = await q1<{ n: number }>("SELECT count(*)::int AS n FROM crm_messages WHERE status = 'queued'");
 
   return (

@@ -2,8 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { hashPassword, login, logout, requireUser } from "@/lib/crm/auth";
 import { q, q1 } from "@/lib/crm/db";
+import { leadWhere, type LeadFilter } from "@/lib/crm/leadQuery";
+import { channelStatus, renderTemplate } from "@/lib/crm/messaging";
 import { CHANNELS, STAGE_IDS, TRIGGERS, type SequenceStep, type StageId } from "@/lib/crm/config";
 import {
   changeStage,
@@ -11,9 +14,13 @@ import {
   deliver,
   enroll,
   getLead,
+  importLeads,
+  LEAD_SELECT,
   logActivity,
+  type Lead,
   recordMessage,
   runDueFollowups,
+  runScheduledEmails,
   stopEnrollments,
 } from "@/lib/crm/engine";
 
@@ -173,33 +180,87 @@ export async function stopSequenceAction(leadId: number, sequenceId: number) {
   refresh(leadId);
 }
 
-export async function importLeadsAction(rows: Record<string, string>[]) {
+/**
+ * One batch of a CSV import. The browser sends the file in small batches and
+ * refreshes once at the end, so large files never hit a request timeout.
+ */
+export async function importLeadsAction(rows: Record<string, string>[], startFollowups = true) {
   const user = await requireUser();
-  let created = 0;
-  let merged = 0;
-  for (const r of rows.slice(0, 1000)) {
-    const name = (r.name ?? "").trim();
-    if (!name) continue;
-    const res = await createOrMergeLead(
-      {
-        name,
-        business: r.business,
-        email: r.email,
-        phone: r.phone,
-        service: r.service,
-        source: r.source || "manual",
-        value: Number((r.value ?? "").replace(/[^\d.]/g, "")) || 0,
-        tags: tags(r.tags ?? ""),
-        notes: r.notes,
-        assigned_to: user.id,
-      },
-      { userId: user.id },
-    );
-    if (res.created) created++;
-    else merged++;
-  }
+  return importLeads(
+    rows.slice(0, 200).map((r) => ({
+      name: r.name ?? "",
+      business: r.business ?? "",
+      email: r.email ?? "",
+      phone: r.phone ?? "",
+      service: r.service ?? "",
+      source: r.source ?? "",
+      value: Number((r.value ?? "").replace(/[^\d.]/g, "")) || 0,
+      tags: tags(r.tags ?? ""),
+      notes: r.notes ?? "",
+    })),
+    { userId: user.id, startFollowups },
+  );
+}
+
+export async function finishImportAction() {
+  await requireUser();
   refresh();
-  return { created, merged };
+}
+
+/* ---------- scheduled emails ---------- */
+
+/**
+ * Schedules one email format to each selected lead for a chosen day/time. The
+ * message is filled in per lead now; it goes out from the connected Gmail
+ * (webora99@gmail.com) on the next automation tick after `when`.
+ */
+export async function scheduleEmailAction(input: { ids: number[] | null; filter: LeadFilter | null; templateId: number; when: string }) {
+  const user = await requireUser();
+  const tpl = await q1<{ name: string; subject: string; body: string; channel: string }>("SELECT name, subject, body, channel FROM crm_templates WHERE id = $1", [input.templateId]);
+  if (!tpl || tpl.channel !== "email") return { error: "Pick an email format.", scheduled: 0, skipped: 0 };
+  const when = new Date(input.when);
+  if (Number.isNaN(when.getTime())) return { error: "Pick a valid day and time.", scheduled: 0, skipped: 0 };
+
+  let leads: Lead[];
+  if (input.filter) {
+    const w = leadWhere(input.filter);
+    leads = await q<Lead>(`${LEAD_SELECT} ${w.sql} ORDER BY l.id LIMIT 5000`, w.params);
+  } else {
+    const ids = (input.ids ?? []).map(Number).filter(Boolean).slice(0, 5000);
+    if (!ids.length) return { error: "Select at least one lead.", scheduled: 0, skipped: 0 };
+    leads = await q<Lead>(`${LEAD_SELECT} WHERE l.id = ANY($1::int[])`, [ids]);
+  }
+  const withEmail = leads.filter((l) => l.email.includes("@"));
+  if (withEmail.length) {
+    const rows = withEmail.map((l) => ({
+      lead_id: l.id,
+      to_addr: l.email,
+      subject: renderTemplate(tpl.subject, l),
+      body: renderTemplate(tpl.body, l),
+    }));
+    await q(
+      `INSERT INTO crm_messages (lead_id, channel, to_addr, subject, body, status, scheduled_for)
+       SELECT x.lead_id, 'email', x.to_addr, x.subject, x.body, 'scheduled', $2
+       FROM jsonb_to_recordset($1::jsonb) AS x(lead_id int, to_addr text, subject text, body text)`,
+      [JSON.stringify(rows), when],
+    );
+    const label = when.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+    await q("INSERT INTO crm_activities (lead_id, user_id, type, body) SELECT unnest($1::int[]), $2, 'email', $3", [
+      withEmail.map((l) => l.id),
+      user.id,
+      `Email “${tpl.name}” scheduled for ${label}`,
+    ]);
+  }
+  // Anything due right now goes out straight after this response.
+  if (when.getTime() <= Date.now() + 60_000) after(() => runScheduledEmails({ deadline: Date.now() + 25_000 }).catch(() => {}));
+  refresh();
+  return { error: "", scheduled: withEmail.length, skipped: leads.length - withEmail.length, emailReady: channelStatus().email };
+}
+
+export async function cancelScheduledAction(ids: number[]) {
+  await requireUser();
+  await q("UPDATE crm_messages SET status = 'skipped', error = 'cancelled' WHERE id = ANY($1::int[]) AND status = 'scheduled'", [ids]);
+  refresh();
 }
 
 /* ---------- tasks ---------- */
@@ -249,7 +310,9 @@ export async function dismissMessageAction(id: number) {
 
 export async function runAutomationNowAction() {
   await requireUser();
-  await runDueFollowups();
+  const deadline = Date.now() + 20_000;
+  await runScheduledEmails({ deadline });
+  await runDueFollowups({ deadline });
   refresh();
 }
 
@@ -287,6 +350,23 @@ export async function deleteTemplateAction(id: number) {
   await q("DELETE FROM crm_templates WHERE id = $1", [id]);
   refresh();
   return { error: "" };
+}
+
+/** Deletes several formats at once; ones still used by a sequence are kept and named. */
+export async function deleteTemplatesAction(ids: number[]) {
+  await requireUser();
+  const clean = ids.map(Number).filter(Boolean);
+  if (!clean.length) return { deleted: 0, kept: [] as string[] };
+  const used = await q<{ id: number; name: string }>(
+    `SELECT t.id, t.name FROM crm_templates t WHERE t.id = ANY($1::int[]) AND EXISTS (
+       SELECT 1 FROM crm_sequences s, jsonb_array_elements(s.steps) st WHERE (st->>'templateId')::int = t.id)`,
+    [clean],
+  );
+  const keep = new Set(used.map((u) => u.id));
+  const del = clean.filter((id) => !keep.has(id));
+  if (del.length) await q("DELETE FROM crm_templates WHERE id = ANY($1::int[])", [del]);
+  refresh();
+  return { deleted: del.length, kept: used.map((u) => u.name) };
 }
 
 /* ---------- sequences ---------- */

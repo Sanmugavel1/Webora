@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Mail, MessageCircle } from "lucide-react";
-import { dismissMessageAction, markMessageSentAction } from "@/app/crm/actions";
+import { cancelScheduledAction, dismissMessageAction, markMessageSentAction } from "@/app/crm/actions";
 import { mailtoLink, waLink } from "@/lib/crm/template";
 
 /** Opening the prepared WhatsApp/email counts as sending it — one tap per follow-up. */
@@ -24,5 +24,18 @@ export function OutboxSend({ id, channel, to, subject, body }: { id: number; cha
       </a>
       <button disabled={pending} onClick={() => start(() => dismissMessageAction(id))} className="crm-btn crm-btn-ghost crm-btn-sm">Skip</button>
     </div>
+  );
+}
+
+export function CancelScheduled({ ids, label }: { ids: number[]; label: string }) {
+  const [pending, start] = useTransition();
+  return (
+    <button
+      disabled={pending}
+      onClick={() => { if (ids.length > 1 && !confirm(`Cancel ${ids.length} scheduled emails?`)) return; start(() => cancelScheduledAction(ids)); }}
+      className="crm-btn crm-btn-ghost crm-btn-sm"
+    >
+      {pending ? "Cancelling…" : label}
+    </button>
   );
 }

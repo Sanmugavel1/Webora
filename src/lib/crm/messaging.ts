@@ -13,6 +13,9 @@ let transport: nodemailer.Transporter | null = null;
 export async function sendEmail(to: string, subject: string, body: string) {
   if (!channelStatus().email) throw new Error("Email not configured (SMTP_USER / SMTP_PASS).");
   transport ??= nodemailer.createTransport({
+    // Pooled so a batch of scheduled emails reuses one SMTP connection.
+    pool: true,
+    maxConnections: 1,
     host: process.env.SMTP_HOST || "smtp.gmail.com",
     port: Number(process.env.SMTP_PORT || 465),
     secure: Number(process.env.SMTP_PORT || 465) === 465,
