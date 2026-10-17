@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, MessageCircle, Pencil, Shapes, Trash2, X } from "lucide-react";
+import { CalendarClock, MessageCircle, Pencil, Shapes, SkipForward, Trash2, X } from "lucide-react";
 import { deleteLeadsAction, scheduleEmailAction, setDomainAction, whatsappOpenedAction } from "@/app/crm/actions";
 import { sourceLabel, type StageId } from "@/lib/crm/config";
 import { fmtDate, inr, timeAgo } from "@/lib/crm/format";
@@ -29,6 +29,14 @@ export type LeadRow = {
 };
 type Filter = { q: string; stage: string; source: string; tag: string; domain: string };
 type Tpl = { id: number; name: string; subject: string; body: string };
+type WaTpl = { id: number; name: string; body: string };
+
+const WA_KEY = "crm-wa-format";
+const waListeners = new Set<() => void>();
+function subscribeWa(fn: () => void) { waListeners.add(fn); return () => { waListeners.delete(fn); }; }
+let waMem = ""; // fallback when browser storage is blocked
+function readWa() { try { return localStorage.getItem(WA_KEY) ?? waMem; } catch { return waMem; } }
+function pickWa(v: string) { waMem = v; try { localStorage.setItem(WA_KEY, v); } catch {} waListeners.forEach((fn) => fn()); }
 
 /** A day in India time as yyyy-mm-dd, for the date picker. */
 const istDay = (offsetDays = 0) => new Date(Date.now() + 5.5 * 3600_000 + offsetDays * 86_400_000).toISOString().slice(0, 10);
@@ -36,10 +44,14 @@ const todayIst = () => istDay();
 /** Default to the next 9 AM: today if it's still early, otherwise tomorrow. */
 const defaultDay = () => (new Date(Date.now() + 5.5 * 3600_000).getUTCHours() < 9 ? istDay() : istDay(1));
 
-export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, domains }: { leads: LeadRow[]; total: number; filter: Filter; emailTemplates: Tpl[]; emailReady: boolean; domains: string[] }) {
+export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, emailReady, domains }: { leads: LeadRow[]; total: number; filter: Filter; emailTemplates: Tpl[]; waTemplates: WaTpl[]; emailReady: boolean; domains: string[] }) {
+  // The chosen WhatsApp format is remembered on this device.
+  const saved = useSyncExternalStore(subscribeWa, readWa, () => "");
+  const waTpl = waTemplates.find((t) => String(t.id) === saved) ?? null;
+  const waId = waTpl ? saved : "";
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
-  const [open, setOpen] = useState<"" | "email" | "domain">("");
+  const [open, setOpen] = useState<"" | "email" | "domain" | "whatsapp">("");
   const [deleting, startDelete] = useTransition();
   const router = useRouter();
   const pageIds = leads.map((l) => l.id);
@@ -88,6 +100,16 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, d
 
   return (
     <>
+      <div className="crm-card mb-3 flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+        <MessageCircle className="h-4 w-4 text-[#25d366]" />
+        <span className="font-medium">WhatsApp format</span>
+        <select value={waId} onChange={(e) => pickWa(e.target.value)} className="crm-input w-auto min-w-48" aria-label="WhatsApp format">
+          <option value="">Just “Hi name,”</option>
+          {waTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <span className="text-xs text-[var(--crm-ink-3)]">Tap 💬 on a lead → WhatsApp opens with this message ready, and the lead moves to Contacted. Or tick leads → “Send WhatsApp” to go one after another.</span>
+      </div>
+
       <div className="crm-card hidden overflow-x-auto md:block">
         <table className="crm-table">
           <thead>
@@ -117,7 +139,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, d
                 <td suppressHydrationWarning className={l.next_followup_at && new Date(l.next_followup_at) < new Date() ? "text-amber-300" : "text-[var(--crm-ink-2)]"}>{fmtDate(l.next_followup_at, true)}</td>
                 <td suppressHydrationWarning className="text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</td>
                 <td className="whitespace-nowrap">
-                  {l.phone && <WhatsAppLink lead={l} className="inline-flex rounded p-1 text-[#25d366] hover:bg-[#25d366]/10" />}
+                  {l.phone && <WhatsAppLink lead={l} tpl={waTpl} className="inline-flex rounded p-1 text-[#25d366] hover:bg-[#25d366]/10" />}
                   <Link href={`/crm/leads/${l.id}#edit`} className="inline-flex rounded p-1 text-[var(--crm-ink-3)] hover:bg-white/5 hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`} title="Edit lead">
                     <Pencil className="h-4 w-4" />
                   </Link>
@@ -143,7 +165,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, d
               </span>
               <span suppressHydrationWarning className="text-xs text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</span>
             </Link>
-            {l.phone && <WhatsAppLink lead={l} className="rounded p-1 text-[#25d366]" />}
+            {l.phone && <WhatsAppLink lead={l} tpl={waTpl} className="rounded p-1 text-[#25d366]" />}
             <Link href={`/crm/leads/${l.id}#edit`} className="rounded p-1 text-[var(--crm-ink-3)] hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`}>
               <Pencil className="h-4 w-4" />
             </Link>
@@ -165,12 +187,22 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, d
                 </button>
               )}
               <span className="ml-auto flex gap-2">
+                <button onClick={() => setOpen((o) => (o === "whatsapp" ? "" : "whatsapp"))} className="crm-btn crm-btn-wa crm-btn-sm"><MessageCircle className="h-3.5 w-3.5" /> Send WhatsApp</button>
                 <button onClick={() => setOpen((o) => (o === "email" ? "" : "email"))} className="crm-btn crm-btn-primary crm-btn-sm"><CalendarClock className="h-3.5 w-3.5" /> Schedule email</button>
                 <button disabled={deleting} onClick={() => setOpen((o) => (o === "domain" ? "" : "domain"))} className="crm-btn crm-btn-ghost crm-btn-sm"><Shapes className="h-3.5 w-3.5" /> Move to domain</button>
                 <button disabled={deleting} onClick={() => remove(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null }, count)} className="crm-btn crm-btn-danger crm-btn-sm"><Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Delete"}</button>
                 <button onClick={clear} className="crm-btn crm-btn-ghost crm-btn-sm" aria-label="Clear selection"><X className="h-3.5 w-3.5" /></button>
               </span>
             </div>
+            {open === "whatsapp" && (
+              <WhatsAppQueue
+                leads={leads.filter((l) => (allMatching || sel.has(l.id)) && l.phone)}
+                skipped={leads.filter((l) => (allMatching || sel.has(l.id)) && !l.phone).length}
+                more={allMatching && total > leads.length}
+                tpl={waTpl}
+                onDone={() => { clear(); router.refresh(); }}
+              />
+            )}
             {open === "domain" && (
               <MoveDomainForm domains={domains} count={count} busy={deleting} onMove={(d) => setDomain(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null }, d)} />
             )}
@@ -190,21 +222,71 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, d
   );
 }
 
-/** Opens the lead's WhatsApp chat; a "New" lead moves to "Contacted" as it opens. */
-function WhatsAppLink({ lead, className }: { lead: LeadRow; className: string }) {
+function waMessage(lead: LeadRow, tpl: WaTpl | null) {
+  return tpl ? renderTemplate(tpl.body, lead) : `Hi ${lead.name.split(" ")[0]}, `;
+}
+
+/** Opens the lead's WhatsApp chat with the chosen format filled in; a "New" lead moves to "Contacted". */
+function WhatsAppLink({ lead, tpl, className }: { lead: LeadRow; tpl: WaTpl | null; className: string }) {
   const router = useRouter();
+  const text = waMessage(lead, tpl);
   return (
     <a
-      href={waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `)}
+      href={waLink(lead.phone, text)}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={() => whatsappOpenedAction(lead.id).then(() => router.refresh(), () => {})}
+      onClick={() => whatsappOpenedAction(lead.id, tpl ? text : "", tpl?.name).then(() => router.refresh(), () => {})}
       className={className}
       aria-label={`WhatsApp ${lead.name}`}
       title="Open WhatsApp chat (moves New → Contacted)"
     >
       <MessageCircle className="h-4 w-4" />
     </a>
+  );
+}
+
+/**
+ * One tap per lead: browsers only let a click open one WhatsApp tab, so the
+ * ticked leads are sent in turn — each tap opens the next chat, already filled in.
+ */
+function WhatsAppQueue({ leads, skipped, more, tpl, onDone }: { leads: LeadRow[]; skipped: number; more: boolean; tpl: WaTpl | null; onDone: () => void }) {
+  const [i, setI] = useState(0);
+  const [sent, setSent] = useState(0);
+  const cur = leads[i];
+  if (!cur) {
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--crm-line)] pt-3 text-sm">
+        <span>✅ Done — {sent} WhatsApp{sent === 1 ? "" : "s"} opened{skipped ? `, ${skipped} skipped (no phone)` : ""}.</span>
+        <button onClick={onDone} className="crm-btn crm-btn-ghost crm-btn-sm">Close</button>
+      </div>
+    );
+  }
+  const text = waMessage(cur, tpl);
+  return (
+    <div className="mt-3 grid gap-3 border-t border-[var(--crm-line)] pt-3 lg:grid-cols-[1fr_1.2fr]">
+      <div className="space-y-2 text-sm">
+        <p className="text-[var(--crm-ink-2)]">
+          {i + 1} of {leads.length}{skipped ? ` · ${skipped} without phone skipped` : ""}{more ? " · this page only" : ""} · format: <b>{tpl?.name ?? "Just “Hi name,”"}</b>
+        </p>
+        <p className="text-base font-semibold">{cur.name} <span className="text-sm font-normal text-[var(--crm-ink-3)]">{cur.phone}</span></p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => {
+              window.open(waLink(cur.phone, text), "_blank", "noopener");
+              whatsappOpenedAction(cur.id, tpl ? text : "", tpl?.name).catch(() => {});
+              setSent((n) => n + 1);
+              setI(i + 1);
+            }}
+            className="crm-btn crm-btn-wa"
+          >
+            <MessageCircle className="h-4 w-4" /> Open WhatsApp{i + 1 < leads.length ? " & next" : ""}
+          </button>
+          <button onClick={() => setI((n) => n + 1)} className="crm-btn crm-btn-ghost"><SkipForward className="h-4 w-4" /> Skip</button>
+        </div>
+        <p className="text-xs text-[var(--crm-ink-3)]">Press Send in WhatsApp, come back here and tap again for the next lead.</p>
+      </div>
+      <p className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded-xl bg-[#0b141a] p-3 text-[13px] leading-relaxed text-[#e9edef]">{text}</p>
+    </div>
   );
 }
 

@@ -267,9 +267,16 @@ export async function markRepliedAction(id: number) {
 }
 
 /** The WhatsApp button opens the chat on this device; opening it counts as contacting a new lead. */
-export async function whatsappOpenedAction(id: number) {
+export async function whatsappOpenedAction(id: number, body = "", formatName = "") {
   const user = await requireUser();
-  await logActivity(id, "whatsapp", "WhatsApp chat opened from the CRM", user.id);
+  if (body.trim()) {
+    await q(
+      `INSERT INTO crm_messages (lead_id, channel, to_addr, body, status, sent_at)
+       SELECT id, 'whatsapp', phone, $2, 'sent', now() FROM crm_leads WHERE id = $1`,
+      [id, body],
+    );
+  }
+  await logActivity(id, "whatsapp", body.trim() ? `WhatsApp${formatName ? ` “${formatName}”` : ""} sent:\n${body}` : "WhatsApp chat opened from the CRM", user.id);
   await markContacted(id, user.id);
   refresh(id);
 }
