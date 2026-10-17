@@ -123,6 +123,7 @@ export async function createLeadAction(fd: FormData) {
     },
     { userId: user.id },
   );
+  await rememberDomains([str(fd, "domain")]);
   await runDueFollowups({ leadId: id });
   refresh(id);
   redirect(str(fd, "then") === "another" ? `/crm/leads/new?added=${id}` : `/crm/leads/${id}`);
@@ -151,6 +152,7 @@ export async function updateLeadAction(id: number, fd: FormData) {
       str(fd, "domain"),
     ],
   );
+  await rememberDomains([str(fd, "domain")]);
   const stage = str(fd, "stage") as StageId;
   if (STAGE_IDS.includes(stage)) await changeStage(id, stage, user.id);
   refresh(id);
@@ -178,9 +180,52 @@ export async function deleteLeadsAction(input: { ids: number[] | null; filter: L
   return { deleted: rows.length };
 }
 
+/* ---------- domains ---------- */
+
+const cleanDomain = (s: string) => s.trim().replace(/\s+/g, " ").slice(0, 60);
+
+/** Saves domain names so they stay listed even when no lead uses them any more. */
+async function rememberDomains(names: string[]) {
+  const list = [...new Set(names.map(cleanDomain).filter(Boolean))];
+  if (list.length) await q("INSERT INTO crm_domains (name) SELECT unnest($1::text[]) ON CONFLICT DO NOTHING", [list]);
+}
+
+export async function createDomainAction(name: string) {
+  await requireUser();
+  const d = cleanDomain(name);
+  if (!d) return { error: "Type a domain name." };
+  const taken = await q("SELECT 1 FROM crm_domains WHERE lower(name) = lower($1) UNION ALL SELECT 1 FROM crm_leads WHERE lower(trim(domain)) = lower($1) LIMIT 1", [d]);
+  if (taken.length) return { error: `“${d}” already exists.` };
+  await q("INSERT INTO crm_domains (name) VALUES ($1) ON CONFLICT DO NOTHING", [d]);
+  refresh();
+  return { error: "" };
+}
+
+/** Renames a domain on every lead in it. Renaming onto an existing domain merges the two. */
+export async function renameDomainAction(from: string, to: string) {
+  await requireUser();
+  const d = cleanDomain(to);
+  if (!d) return { error: "Type the new name.", updated: 0 };
+  const moved = await q("UPDATE crm_leads SET domain = $2, updated_at = now() WHERE lower(trim(domain)) = lower(trim($1)) RETURNING id", [from, d]);
+  await q("DELETE FROM crm_domains WHERE lower(name) = lower(trim($1))", [from]);
+  await q("INSERT INTO crm_domains (name) VALUES ($1) ON CONFLICT DO NOTHING", [d]);
+  refresh();
+  return { error: "", updated: moved.length };
+}
+
+/** Removes a domain; its leads stay, with no domain set. */
+export async function deleteDomainAction(name: string) {
+  await requireUser();
+  const cleared = await q("UPDATE crm_leads SET domain = '', updated_at = now() WHERE lower(trim(domain)) = lower(trim($1)) RETURNING id", [name]);
+  await q("DELETE FROM crm_domains WHERE lower(name) = lower(trim($1))", [name]);
+  refresh();
+  return { cleared: cleared.length };
+}
+
 export async function setDomainAction(input: { ids: number[] | null; filter: LeadFilter | null }, domain: string) {
   await requireUser();
-  const d = domain.trim();
+  const d = cleanDomain(domain);
+  await rememberDomains([d]);
   let n: number;
   if (input.filter) {
     const w = leadWhere(input.filter);
@@ -273,6 +318,7 @@ export async function stopSequenceAction(leadId: number, sequenceId: number) {
  */
 export async function importLeadsAction(rows: Record<string, string>[], startFollowups = true) {
   const user = await requireUser();
+  await rememberDomains(rows.slice(0, 200).map((r) => r.domain ?? ""));
   return importLeads(
     rows.slice(0, 200).map((r) => ({
       name: r.name ?? "",

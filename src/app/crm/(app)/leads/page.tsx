@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/crm/auth";
 import { q } from "@/lib/crm/db";
 import { LEAD_SELECT, type Lead } from "@/lib/crm/engine";
 import { leadWhere, NO_DOMAIN } from "@/lib/crm/leadQuery";
+import { listDomains } from "@/lib/crm/domains";
 import { channelStatus } from "@/lib/crm/messaging";
 import { SOURCES, STAGES } from "@/lib/crm/config";
 import { Empty, PageTitle } from "@/components/crm/ui";
@@ -38,8 +39,9 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
     q<Lead>(`${LEAD_SELECT} ${w.sql} ORDER BY ${order}, l.id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, w.params),
     q<{ n: number }>(`SELECT count(*)::int AS n FROM crm_leads l ${w.sql}`, w.params),
     q<{ id: number; name: string; subject: string; body: string }>("SELECT id, name, subject, body FROM crm_templates WHERE channel = 'email' ORDER BY name"),
-    q<{ domain: string; n: number }>("SELECT mode() WITHIN GROUP (ORDER BY trim(domain)) AS domain, count(*)::int AS n FROM crm_leads WHERE trim(domain) <> '' GROUP BY lower(trim(domain)) ORDER BY 1"),
+    listDomains(),
   ]);
+  domains.sort((a, b) => a.domain.localeCompare(b.domain));
   const total = countRow[0]?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const pageHref = (p: number) => {
@@ -55,7 +57,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
     <>
       <PageTitle
         title="Leads"
-        sub={`${total.toLocaleString("en-IN")} ${filtered ? "matching" : "total"}${pages > 1 ? ` · page ${page} of ${pages}` : ""} · tick leads to schedule an email or delete`}
+        sub={`${total.toLocaleString("en-IN")} ${filtered ? "matching" : "total"}${pages > 1 ? ` · page ${page} of ${pages}` : ""} · tick leads to email, move to a domain or delete`}
         actions={
           <>
             <Link href="/crm/domains" className="crm-btn crm-btn-ghost"><Shapes className="h-4 w-4" /> Domains</Link>
@@ -81,7 +83,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
         </select>
         <select name="domain" defaultValue={domains.find((d) => d.domain.toLowerCase() === domain.toLowerCase())?.domain ?? domain} className="crm-input w-auto" aria-label="Domain">
           <option value="">All domains</option>
-          {domains.map((d) => <option key={d.domain} value={d.domain}>{d.domain} ({d.n.toLocaleString("en-IN")})</option>)}
+          {domains.map((d) => <option key={d.domain} value={d.domain}>{d.domain} ({d.leads.toLocaleString("en-IN")})</option>)}
           <option value={NO_DOMAIN}>No domain set</option>
         </select>
         <select name="sort" defaultValue={sort} className="crm-input w-auto" aria-label="Sort">
@@ -117,6 +119,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
             filter={{ q: term, stage, source, tag, domain }}
             emailTemplates={emailTemplates}
             emailReady={channelStatus().email}
+            domains={domains.map((d) => d.domain)}
           />
           {pages > 1 && (
             <nav className="mt-4 flex items-center justify-center gap-2 text-sm" aria-label="Pages">

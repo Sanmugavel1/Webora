@@ -36,10 +36,10 @@ const todayIst = () => istDay();
 /** Default to the next 9 AM: today if it's still early, otherwise tomorrow. */
 const defaultDay = () => (new Date(Date.now() + 5.5 * 3600_000).getUTCHours() < 9 ? istDay() : istDay(1));
 
-export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }: { leads: LeadRow[]; total: number; filter: Filter; emailTemplates: Tpl[]; emailReady: boolean }) {
+export function LeadsTable({ leads, total, filter, emailTemplates, emailReady, domains }: { leads: LeadRow[]; total: number; filter: Filter; emailTemplates: Tpl[]; emailReady: boolean; domains: string[] }) {
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState<"" | "email" | "domain">("");
   const [deleting, startDelete] = useTransition();
   const router = useRouter();
   const pageIds = leads.map((l) => l.id);
@@ -54,11 +54,9 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
     setAllMatching(false);
     setSel((s) => { const n = new Set(s); pageIds.forEach((id) => (allOnPage ? n.delete(id) : n.add(id))); return n; });
   }
-  function clear() { setSel(new Set()); setAllMatching(false); setOpen(false); }
+  function clear() { setSel(new Set()); setAllMatching(false); setOpen(""); }
 
-  function setDomain(target: { ids: number[] | null; filter: Filter | null }) {
-    const d = prompt(`Domain (business type) for ${count.toLocaleString("en-IN")} lead${count === 1 ? "" : "s"} — e.g. Gym, Shoe store. Leave empty to clear.`);
-    if (d === null) return;
+  function setDomain(target: { ids: number[] | null; filter: Filter | null }, d: string) {
     startDelete(async () => {
       try {
         await setDomainAction(target, d);
@@ -119,7 +117,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
                 <td suppressHydrationWarning className={l.next_followup_at && new Date(l.next_followup_at) < new Date() ? "text-amber-300" : "text-[var(--crm-ink-2)]"}>{fmtDate(l.next_followup_at, true)}</td>
                 <td suppressHydrationWarning className="text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</td>
                 <td className="whitespace-nowrap">
-                  <Link href={`/crm/leads/${l.id}#edit`} className="rounded p-1 text-[var(--crm-ink-3)] hover:bg-white/5 hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`} title="Edit lead">
+                  <Link href={`/crm/leads/${l.id}#edit`} className="inline-flex rounded p-1 text-[var(--crm-ink-3)] hover:bg-white/5 hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`} title="Edit lead">
                     <Pencil className="h-4 w-4" />
                   </Link>
                   <button disabled={deleting} onClick={() => remove({ ids: [l.id], filter: null }, 1, l.name)} className="rounded p-1 text-[var(--crm-ink-3)] hover:bg-rose-500/10 hover:text-rose-300" aria-label={`Delete ${l.name}`} title="Delete lead">
@@ -165,13 +163,16 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
                 </button>
               )}
               <span className="ml-auto flex gap-2">
-                <button onClick={() => setOpen((o) => !o)} className="crm-btn crm-btn-primary crm-btn-sm"><CalendarClock className="h-3.5 w-3.5" /> Schedule email</button>
-                <button disabled={deleting} onClick={() => setDomain(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null })} className="crm-btn crm-btn-ghost crm-btn-sm"><Shapes className="h-3.5 w-3.5" /> Set domain</button>
+                <button onClick={() => setOpen((o) => (o === "email" ? "" : "email"))} className="crm-btn crm-btn-primary crm-btn-sm"><CalendarClock className="h-3.5 w-3.5" /> Schedule email</button>
+                <button disabled={deleting} onClick={() => setOpen((o) => (o === "domain" ? "" : "domain"))} className="crm-btn crm-btn-ghost crm-btn-sm"><Shapes className="h-3.5 w-3.5" /> Move to domain</button>
                 <button disabled={deleting} onClick={() => remove(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null }, count)} className="crm-btn crm-btn-danger crm-btn-sm"><Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Delete"}</button>
                 <button onClick={clear} className="crm-btn crm-btn-ghost crm-btn-sm" aria-label="Clear selection"><X className="h-3.5 w-3.5" /></button>
               </span>
             </div>
-            {open && (
+            {open === "domain" && (
+              <MoveDomainForm domains={domains} count={count} busy={deleting} onMove={(d) => setDomain(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null }, d)} />
+            )}
+            {open === "email" && (
               <ScheduleForm
                 templates={emailTemplates}
                 emailReady={emailReady}
@@ -184,6 +185,35 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
         </div>
       )}
     </>
+  );
+}
+
+const NEW = "__new";
+
+function MoveDomainForm({ domains, count, busy, onMove }: { domains: string[]; count: number; busy: boolean; onMove: (domain: string) => void }) {
+  const [pick, setPick] = useState(domains[0] ?? NEW);
+  const [name, setName] = useState("");
+  const target = pick === NEW ? name.trim() : pick;
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-[var(--crm-line)] pt-3">
+      <label className="block min-w-48 flex-1 sm:flex-none">
+        <span className="crm-label">Move {count.toLocaleString("en-IN")} lead{count === 1 ? "" : "s"} to</span>
+        <select value={pick} onChange={(e) => setPick(e.target.value)} className="crm-input">
+          {domains.map((d) => <option key={d} value={d}>{d}</option>)}
+          <option value={NEW}>+ New domain…</option>
+          <option value="">No domain (clear)</option>
+        </select>
+      </label>
+      {pick === NEW && (
+        <label className="block min-w-48 flex-1 sm:flex-none">
+          <span className="crm-label">New domain name</span>
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bakery" maxLength={60} className="crm-input" />
+        </label>
+      )}
+      <button disabled={busy || (pick === NEW && !target)} onClick={() => onMove(target)} className="crm-btn crm-btn-primary">
+        {busy ? "Moving…" : "Move"}
+      </button>
+    </div>
   );
 }
 

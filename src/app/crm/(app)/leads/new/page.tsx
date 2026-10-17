@@ -4,6 +4,7 @@ import { listUsers, requireUser } from "@/lib/crm/auth";
 import { q1 } from "@/lib/crm/db";
 import { Card, PageTitle } from "@/components/crm/ui";
 import { LeadFields } from "@/components/crm/LeadFields";
+import { domainNames } from "@/lib/crm/domains";
 import { createLeadAction } from "../../../actions";
 
 export const metadata = { title: "Create lead" };
@@ -11,9 +12,10 @@ export const metadata = { title: "Create lead" };
 export default async function NewLeadPage({ searchParams }: PageProps<"/crm/leads/new">) {
   await requireUser();
   const added = Number((await searchParams).added) || 0;
-  const [users, last] = await Promise.all([
+  const [users, last, domains] = await Promise.all([
     listUsers(),
     added ? q1<{ id: number; name: string }>("SELECT id, name FROM crm_leads WHERE id = $1", [added]) : undefined,
+    domainNames(),
   ]);
 
   return (
@@ -30,7 +32,7 @@ export default async function NewLeadPage({ searchParams }: PageProps<"/crm/lead
       )}
       <Card className="max-w-3xl">
         <form action={createLeadAction}>
-          <LeadFields users={users} />
+          <LeadFields users={users} domains={domains} />
           <div className="mt-5 flex flex-wrap justify-end gap-2">
             <button name="then" value="another" className="crm-btn crm-btn-ghost">Save &amp; add another</button>
             <button name="then" value="open" className="crm-btn crm-btn-primary">Save lead</button>

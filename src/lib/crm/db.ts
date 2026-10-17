@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS crm_leads (
   stage_changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS crm_leads_stage_idx ON crm_leads(stage);
+CREATE TABLE IF NOT EXISTS crm_domains (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS crm_domains_name_idx ON crm_domains(lower(name));
 -- "Domain" = business type (Gym, Shoe store…). Added later; backfilled once when the column is created.
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'crm_leads' AND column_name = 'domain') THEN
@@ -55,6 +61,8 @@ DO $$ BEGIN
     UPDATE crm_leads SET domain = CASE WHEN 'gym' = ANY(tags) THEN 'Gym' ELSE initcap(trim(business)) END;
   END IF;
 END $$;
+-- Every domain a lead uses is a saved domain, so it stays listed even after its last lead moves out.
+INSERT INTO crm_domains (name) SELECT DISTINCT ON (lower(trim(domain))) trim(domain) FROM crm_leads WHERE trim(domain) <> '' ON CONFLICT DO NOTHING;
 CREATE INDEX IF NOT EXISTS crm_leads_email_idx ON crm_leads(lower(email));
 CREATE INDEX IF NOT EXISTS crm_leads_phone_idx ON crm_leads(phone);
 

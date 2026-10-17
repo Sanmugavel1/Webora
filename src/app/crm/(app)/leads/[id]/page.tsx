@@ -9,6 +9,7 @@ import { channelStatus } from "@/lib/crm/messaging";
 import { fmtDate, inr, timeAgo, toLocalInput } from "@/lib/crm/format";
 import { Card, PageTitle, StageBadge } from "@/components/crm/ui";
 import { LeadFields } from "@/components/crm/LeadFields";
+import { domainNames } from "@/lib/crm/domains";
 import { Composer, ConfirmSubmit, QuickActions, StageBar } from "@/components/crm/LeadControls";
 import { TaskList } from "@/components/crm/TaskList";
 import { addActivityAction, deleteLeadAction, enrollAction, stopSequenceAction, updateLeadAction } from "../../../actions";
@@ -30,7 +31,7 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
   const lead = await getLead(id);
   if (!lead) notFound();
 
-  const [activities, users, templates, sequences, enrollments, tasks] = await Promise.all([
+  const [activities, users, templates, sequences, enrollments, tasks, domains] = await Promise.all([
     q<{ id: number; type: string; body: string; created_at: Date; user_name: string | null }>(
       "SELECT a.id, a.type, a.body, a.created_at, u.name AS user_name FROM crm_activities a LEFT JOIN crm_users u ON u.id = a.user_id WHERE a.lead_id = $1 ORDER BY a.created_at DESC, a.id DESC LIMIT 200",
       [id],
@@ -46,6 +47,7 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
       "SELECT id, title, due_at, done, lead_id FROM crm_tasks WHERE lead_id = $1 ORDER BY done, due_at NULLS LAST, id",
       [id],
     ),
+    domainNames(),
   ]);
   const lite = { id: lead.id, name: lead.name, business: lead.business, service: lead.service, agent_name: lead.agent_name, phone: lead.phone, email: lead.email, stage: lead.stage };
   const notEnrolled = sequences.filter((s) => s.active && !enrollments.some((e) => e.sequence_id === s.id && e.status === "active"));
@@ -137,7 +139,7 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
 
           <Card title="Details">
             <form id="edit" action={updateLeadAction.bind(null, lead.id)} className="scroll-mt-24">
-              <LeadFields d={lead} users={users} />
+              <LeadFields d={lead} users={users} domains={domains} />
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label>
                   <span className="crm-label">Stage</span>

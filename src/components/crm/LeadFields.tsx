@@ -4,12 +4,15 @@ import { PROJECT_TYPES } from "@/lib/data/contact";
 type Defaults = Partial<{ name: string; business: string; domain: string; email: string; phone: string; service: string; source: string; value: number; tags: string[]; notes: string; assigned_to: number | null }>;
 
 /** Shared field set for the "new lead" and "edit lead" forms. */
-export function LeadFields({ d = {}, users }: { d?: Defaults; users: { id: number; name: string }[] }) {
+export function LeadFields({ d = {}, users, domains = [] }: { d?: Defaults; users: { id: number; name: string }[]; domains?: string[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <F label="Name *"><input name="name" required defaultValue={d.name} className="crm-input" /></F>
       <F label="Business"><input name="business" defaultValue={d.business} className="crm-input" /></F>
-      <F label="Domain (business type)"><input name="domain" defaultValue={d.domain} placeholder="Gym, Shoe store, Resort…" className="crm-input" /></F>
+      <F label="Domain (business type)">
+        <input name="domain" list="crm-domains" defaultValue={d.domain} placeholder="Pick or type a new one" className="crm-input" />
+        <datalist id="crm-domains">{domains.map((x) => <option key={x} value={x} />)}</datalist>
+      </F>
       <F label="Phone / WhatsApp"><input name="phone" type="tel" defaultValue={d.phone} placeholder="98765 43210" className="crm-input" /></F>
       <F label="Email"><input name="email" type="email" defaultValue={d.email} className="crm-input" /></F>
       <F label="Service">
