@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Trash2, X } from "lucide-react";
+import { CalendarClock, Pencil, Trash2, X } from "lucide-react";
 import { deleteLeadsAction, scheduleEmailAction } from "@/app/crm/actions";
 import { sourceLabel, type StageId } from "@/lib/crm/config";
 import { fmtDate, inr, timeAgo } from "@/lib/crm/format";
@@ -80,7 +80,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
           <thead>
             <tr>
               <th className="w-10"><input type="checkbox" checked={allMatching || allOnPage} onChange={togglePage} aria-label="Select all on this page" className="h-4 w-4 cursor-pointer accent-[var(--color-blue)]" /></th>
-              <th>Lead</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th><th className="w-10" />
+              <th>Lead</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th><th className="w-20" />
             </tr>
           </thead>
           <tbody>
@@ -102,7 +102,10 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
                 <td className="text-right tabular-nums">{l.value ? inr(l.value) : "—"}</td>
                 <td suppressHydrationWarning className={l.next_followup_at && new Date(l.next_followup_at) < new Date() ? "text-amber-300" : "text-[var(--crm-ink-2)]"}>{fmtDate(l.next_followup_at, true)}</td>
                 <td suppressHydrationWarning className="text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</td>
-                <td>
+                <td className="whitespace-nowrap">
+                  <Link href={`/crm/leads/${l.id}#edit`} className="rounded p-1 text-[var(--crm-ink-3)] hover:bg-white/5 hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`} title="Edit lead">
+                    <Pencil className="h-4 w-4" />
+                  </Link>
                   <button disabled={deleting} onClick={() => remove({ ids: [l.id], filter: null }, 1, l.name)} className="rounded p-1 text-[var(--crm-ink-3)] hover:bg-rose-500/10 hover:text-rose-300" aria-label={`Delete ${l.name}`} title="Delete lead">
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -124,6 +127,9 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
                 <span className="mt-2 flex items-center gap-2"><StageBadge stage={l.stage} />{l.value > 0 && <span className="text-xs tabular-nums">{inr(l.value)}</span>}</span>
               </span>
               <span suppressHydrationWarning className="text-xs text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</span>
+            </Link>
+            <Link href={`/crm/leads/${l.id}#edit`} className="rounded p-1 text-[var(--crm-ink-3)] hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`}>
+              <Pencil className="h-4 w-4" />
             </Link>
             <button disabled={deleting} onClick={() => remove({ ids: [l.id], filter: null }, 1, l.name)} className="rounded p-1 text-[var(--crm-ink-3)] hover:text-rose-300" aria-label={`Delete ${l.name}`}>
               <Trash2 className="h-4 w-4" />

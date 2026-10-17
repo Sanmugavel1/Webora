@@ -136,7 +136,7 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
           </Card>
 
           <Card title="Details">
-            <form action={updateLeadAction.bind(null, lead.id)}>
+            <form id="edit" action={updateLeadAction.bind(null, lead.id)} className="scroll-mt-24">
               <LeadFields d={lead} users={users} />
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label>
