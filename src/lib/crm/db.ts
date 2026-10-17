@@ -48,6 +48,13 @@ CREATE TABLE IF NOT EXISTS crm_leads (
   stage_changed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS crm_leads_stage_idx ON crm_leads(stage);
+-- "Domain" = business type (Gym, Shoe store…). Added later; backfilled once when the column is created.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'crm_leads' AND column_name = 'domain') THEN
+    ALTER TABLE crm_leads ADD COLUMN domain TEXT NOT NULL DEFAULT '';
+    UPDATE crm_leads SET domain = CASE WHEN 'gym' = ANY(tags) THEN 'Gym' ELSE initcap(trim(business)) END;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS crm_leads_email_idx ON crm_leads(lower(email));
 CREATE INDEX IF NOT EXISTS crm_leads_phone_idx ON crm_leads(phone);
 
@@ -151,12 +158,18 @@ function ensureSchema() {
   if (!globalForPg.crmSchema) {
     globalForPg.crmSchema = (async () => {
       const client = await pool().connect();
+      // Transaction-scoped lock: a session lock leaks through Neon's pooler
+      // (unlock can land on a different backend) and then blocks every cold start.
       try {
-        await client.query("SELECT pg_advisory_lock(424242)");
+        await client.query("BEGIN");
+        await client.query("SELECT pg_advisory_xact_lock(424243)");
         await client.query(SCHEMA);
         await seed(client);
+        await client.query("COMMIT");
+      } catch (err) {
+        await client.query("ROLLBACK").catch(() => {});
+        throw err;
       } finally {
-        await client.query("SELECT pg_advisory_unlock(424242)").catch(() => {});
         client.release();
       }
     })().catch((err) => {

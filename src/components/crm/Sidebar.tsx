@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutDashboard, Users, UserPlus, Columns3, Workflow, Send, FileText, Settings, LogOut, Menu, X, ExternalLink } from "lucide-react";
+import { LayoutDashboard, Users, UserPlus, Columns3, Workflow, Send, FileText, Settings, LogOut, Menu, X, ExternalLink, Shapes } from "lucide-react";
 import { logoutAction } from "@/app/crm/actions";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,7 @@ const NAV = [
   { href: "/crm", label: "Dashboard", icon: LayoutDashboard },
   { href: "/crm/leads", label: "Leads", icon: Users },
   { href: "/crm/leads/new", label: "Create lead", icon: UserPlus },
+  { href: "/crm/domains", label: "Domains", icon: Shapes },
   { href: "/crm/pipeline", label: "Pipeline", icon: Columns3 },
   { href: "/crm/outbox", label: "Outbox", icon: Send, badge: "outbox" },
   { href: "/crm/followups", label: "Follow-ups", icon: Workflow },

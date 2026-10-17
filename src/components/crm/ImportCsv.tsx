@@ -30,6 +30,7 @@ function parseCsv(text: string) {
 
 const ALIASES: Record<string, string> = {
   "full name": "name", "contact": "name", "business name": "business", "company": "business",
+  "category": "domain", "industry": "domain", "business type": "domain", "type": "domain",
   "mobile": "phone", "whatsapp": "phone", "phone number": "phone", "e-mail": "email",
   "project": "service", "looking for": "service", "amount": "value", "deal value": "value", "note": "notes",
 };
@@ -89,7 +90,7 @@ export function ImportCsv() {
           <input type="checkbox" checked={followups} disabled={busy} onChange={(e) => setFollowups(e.target.checked)} className="accent-[var(--color-blue)]" />
           Start follow-ups
         </label>
-        <button type="button" disabled={busy} onClick={() => input.current?.click()} className="crm-btn crm-btn-ghost" title="Columns: name, phone, email, business, service, source, value, tags, notes">
+        <button type="button" disabled={busy} onClick={() => input.current?.click()} className="crm-btn crm-btn-ghost" title="Columns: name, phone, email, business, domain, service, source, value, tags, notes">
           <Upload className="h-4 w-4" /> {busy ? `Importing ${progress.done} / ${progress.total}…` : "Import CSV"}
         </button>
       </div>

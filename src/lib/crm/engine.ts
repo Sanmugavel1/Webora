@@ -7,6 +7,7 @@ export type Lead = {
   id: number;
   name: string;
   business: string;
+  domain: string;
   email: string;
   phone: string;
   service: string;
@@ -37,6 +38,7 @@ export function logActivity(leadId: number, type: string, body: string, userId: 
 export type LeadInput = {
   name: string;
   business?: string;
+  domain?: string;
   email?: string;
   phone?: string;
   service?: string;
@@ -68,12 +70,13 @@ export async function createOrMergeLead(input: LeadInput, opts: { userId?: numbe
     await q(
       `UPDATE crm_leads SET
          business = CASE WHEN business = '' THEN $2 ELSE business END,
+         domain = CASE WHEN domain = '' THEN $6 ELSE domain END,
          email = CASE WHEN email = '' THEN $3 ELSE email END,
          phone = CASE WHEN phone = '' THEN $4 ELSE phone END,
          service = CASE WHEN $5 <> '' THEN $5 ELSE service END,
          updated_at = now()
        WHERE id = $1`,
-      [existing.id, input.business ?? "", email, phone, input.service ?? ""],
+      [existing.id, input.business ?? "", email, phone, input.service ?? "", (input.domain ?? "").trim()],
     );
     await logActivity(existing.id, "enquiry", `Enquired again${input.service ? ` about ${input.service}` : ""}${opts.message ? `:\n${opts.message}` : ""}`, opts.userId);
     return { id: existing.id, created: false };
@@ -81,8 +84,8 @@ export async function createOrMergeLead(input: LeadInput, opts: { userId?: numbe
 
   const stage = input.stage && STAGE_IDS.includes(input.stage) ? input.stage : "new";
   const row = await q1<{ id: number }>(
-    `INSERT INTO crm_leads (name, business, email, phone, service, source, stage, value, tags, notes, assigned_to)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+    `INSERT INTO crm_leads (name, business, email, phone, service, source, stage, value, tags, notes, assigned_to, domain)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
     [
       input.name.trim(),
       (input.business ?? "").trim(),
@@ -95,6 +98,7 @@ export async function createOrMergeLead(input: LeadInput, opts: { userId?: numbe
       input.tags ?? [],
       (input.notes ?? "").trim(),
       input.assigned_to ?? null,
+      (input.domain ?? "").trim(),
     ],
   );
   const id = row!.id;
@@ -268,6 +272,7 @@ export async function runDueFollowups(opts: { leadId?: number; limit?: number; d
 export type ImportRow = {
   name: string;
   business: string;
+  domain: string;
   email: string;
   phone: string;
   service: string;
@@ -292,6 +297,7 @@ export async function importLeads(rows: ImportRow[], opts: { userId: number; sta
       ...raw,
       name: raw.name.trim(),
       business: raw.business.trim(),
+      domain: raw.domain.trim(),
       email: raw.email.trim().toLowerCase(),
       phone: raw.phone.replace(/[^\d+]/g, ""),
       service: raw.service.trim(),
@@ -305,6 +311,7 @@ export async function importLeads(rows: ImportRow[], opts: { userId: number; sta
     if (hit !== undefined) {
       const u = uniq[hit];
       u.business ||= r.business;
+      u.domain ||= r.domain;
       u.email ||= r.email;
       u.phone ||= r.phone;
       u.service ||= r.service;
@@ -343,11 +350,12 @@ export async function importLeads(rows: ImportRow[], opts: { userId: number; sta
       await c.query(
         `UPDATE crm_leads l SET
            business = CASE WHEN l.business = '' THEN x.business ELSE l.business END,
+           domain = CASE WHEN l.domain = '' THEN x.domain ELSE l.domain END,
            email = CASE WHEN l.email = '' THEN x.email ELSE l.email END,
            phone = CASE WHEN l.phone = '' THEN x.phone ELSE l.phone END,
            service = CASE WHEN x.service <> '' THEN x.service ELSE l.service END,
            updated_at = now()
-         FROM jsonb_to_recordset($1::jsonb) AS x(id int, business text, email text, phone text, service text)
+         FROM jsonb_to_recordset($1::jsonb) AS x(id int, business text, domain text, email text, phone text, service text)
          WHERE l.id = x.id`,
         [JSON.stringify(matches)],
       );
@@ -362,10 +370,10 @@ export async function importLeads(rows: ImportRow[], opts: { userId: number; sta
     if (fresh.length) {
       const inserted = (
         await c.query<{ id: number; source: string }>(
-          `INSERT INTO crm_leads (name, business, email, phone, service, source, value, tags, notes, assigned_to)
-           SELECT x.name, x.business, x.email, x.phone, x.service, x.source, x.value,
+          `INSERT INTO crm_leads (name, business, domain, email, phone, service, source, value, tags, notes, assigned_to)
+           SELECT x.name, x.business, x.domain, x.email, x.phone, x.service, x.source, x.value,
                   ARRAY(SELECT jsonb_array_elements_text(x.tags)), x.notes, $2
-           FROM jsonb_to_recordset($1::jsonb) AS x(name text, business text, email text, phone text, service text, source text, value int, tags jsonb, notes text)
+           FROM jsonb_to_recordset($1::jsonb) AS x(name text, business text, domain text, email text, phone text, service text, source text, value int, tags jsonb, notes text)
            RETURNING id, source`,
           [JSON.stringify(fresh), opts.userId],
         )

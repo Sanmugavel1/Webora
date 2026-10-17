@@ -111,6 +111,7 @@ export async function createLeadAction(fd: FormData) {
     {
       name,
       business: str(fd, "business"),
+      domain: str(fd, "domain"),
       email: str(fd, "email"),
       phone: str(fd, "phone"),
       service: str(fd, "service"),
@@ -132,7 +133,7 @@ export async function updateLeadAction(id: number, fd: FormData) {
   const followup = str(fd, "next_followup_at");
   await q(
     `UPDATE crm_leads SET name=$2, business=$3, email=$4, phone=$5, service=$6, source=$7, value=$8, tags=$9,
-       notes=$10, assigned_to=$11, next_followup_at=$12, lost_reason=$13, updated_at=now() WHERE id=$1`,
+       notes=$10, assigned_to=$11, next_followup_at=$12, lost_reason=$13, domain=$14, updated_at=now() WHERE id=$1`,
     [
       id,
       str(fd, "name"),
@@ -147,6 +148,7 @@ export async function updateLeadAction(id: number, fd: FormData) {
       Number(fd.get("assigned_to")) || null,
       followup ? new Date(`${followup}:00+05:30`) : null,
       str(fd, "lost_reason"),
+      str(fd, "domain"),
     ],
   );
   const stage = str(fd, "stage") as StageId;
@@ -174,6 +176,22 @@ export async function deleteLeadsAction(input: { ids: number[] | null; filter: L
   }
   refresh();
   return { deleted: rows.length };
+}
+
+export async function setDomainAction(input: { ids: number[] | null; filter: LeadFilter | null }, domain: string) {
+  await requireUser();
+  const d = domain.trim();
+  let n: number;
+  if (input.filter) {
+    const w = leadWhere(input.filter);
+    w.params.push(d);
+    n = (await q(`UPDATE crm_leads SET domain = $${w.params.length}, updated_at = now() WHERE id IN (SELECT l.id FROM crm_leads l ${w.sql}) RETURNING id`, w.params)).length;
+  } else {
+    const ids = (input.ids ?? []).map(Number).filter(Boolean);
+    n = ids.length ? (await q("UPDATE crm_leads SET domain = $2, updated_at = now() WHERE id = ANY($1::int[]) RETURNING id", [ids, d])).length : 0;
+  }
+  refresh();
+  return { updated: n };
 }
 
 export async function moveStageAction(id: number, stage: StageId) {
@@ -259,6 +277,7 @@ export async function importLeadsAction(rows: Record<string, string>[], startFol
     rows.slice(0, 200).map((r) => ({
       name: r.name ?? "",
       business: r.business ?? "",
+      domain: r.domain ?? "",
       email: r.email ?? "",
       phone: r.phone ?? "",
       service: r.service ?? "",

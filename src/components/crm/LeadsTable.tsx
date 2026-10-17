@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Pencil, Trash2, X } from "lucide-react";
-import { deleteLeadsAction, scheduleEmailAction } from "@/app/crm/actions";
+import { CalendarClock, Pencil, Shapes, Trash2, X } from "lucide-react";
+import { deleteLeadsAction, scheduleEmailAction, setDomainAction } from "@/app/crm/actions";
 import { sourceLabel, type StageId } from "@/lib/crm/config";
 import { fmtDate, inr, timeAgo } from "@/lib/crm/format";
 import { renderTemplate } from "@/lib/crm/template";
@@ -15,6 +15,7 @@ export type LeadRow = {
   id: number;
   name: string;
   business: string;
+  domain: string;
   email: string;
   phone: string;
   service: string;
@@ -26,7 +27,7 @@ export type LeadRow = {
   next_followup_at: string | null;
   created_at: string;
 };
-type Filter = { q: string; stage: string; source: string; tag: string };
+type Filter = { q: string; stage: string; source: string; tag: string; domain: string };
 type Tpl = { id: number; name: string; subject: string; body: string };
 
 /** A day in India time as yyyy-mm-dd, for the date picker. */
@@ -55,6 +56,20 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
   }
   function clear() { setSel(new Set()); setAllMatching(false); setOpen(false); }
 
+  function setDomain(target: { ids: number[] | null; filter: Filter | null }) {
+    const d = prompt(`Domain (business type) for ${count.toLocaleString("en-IN")} lead${count === 1 ? "" : "s"} — e.g. Gym, Shoe store. Leave empty to clear.`);
+    if (d === null) return;
+    startDelete(async () => {
+      try {
+        await setDomainAction(target, d);
+        clear();
+        router.refresh();
+      } catch {
+        alert("Couldn't reach the server — check your connection and try again.");
+      }
+    });
+  }
+
   function remove(target: { ids: number[] | null; filter: Filter | null }, n: number, label?: string) {
     const what = label ?? `${n.toLocaleString("en-IN")} lead${n === 1 ? "" : "s"}`;
     if (!confirm(`Delete ${what} and their whole history? This can't be undone.`)) return;
@@ -80,7 +95,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
           <thead>
             <tr>
               <th className="w-10"><input type="checkbox" checked={allMatching || allOnPage} onChange={togglePage} aria-label="Select all on this page" className="h-4 w-4 cursor-pointer accent-[var(--color-blue)]" /></th>
-              <th>Lead</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th><th className="w-20" />
+              <th>Lead</th><th>Domain</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th><th className="w-20" />
             </tr>
           </thead>
           <tbody>
@@ -96,6 +111,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
                     </div>
                   )}
                 </td>
+                <td>{l.domain ? <Link href={`/crm/leads?domain=${encodeURIComponent(l.domain)}`} className="text-[var(--crm-ink-2)] hover:underline">{l.domain}</Link> : <span className="text-[var(--crm-ink-3)]">—</span>}</td>
                 <td><StageBadge stage={l.stage} /></td>
                 <td className="text-[var(--crm-ink-2)]">{l.service || "—"}</td>
                 <td className="text-[var(--crm-ink-2)]">{sourceLabel(l.source)}</td>
@@ -123,7 +139,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
             <Link href={`/crm/leads/${l.id}`} className="flex min-w-0 flex-1 items-start gap-3">
               <span className="min-w-0 flex-1">
                 <span className="block font-medium">{l.name}</span>
-                <span className="block truncate text-xs text-[var(--crm-ink-3)]">{[l.business, l.service].filter(Boolean).join(" · ") || "—"}</span>
+                <span className="block truncate text-xs text-[var(--crm-ink-3)]">{[l.domain, l.business].filter(Boolean).join(" · ") || "—"}</span>
                 <span className="mt-2 flex items-center gap-2"><StageBadge stage={l.stage} />{l.value > 0 && <span className="text-xs tabular-nums">{inr(l.value)}</span>}</span>
               </span>
               <span suppressHydrationWarning className="text-xs text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</span>
@@ -150,6 +166,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
               )}
               <span className="ml-auto flex gap-2">
                 <button onClick={() => setOpen((o) => !o)} className="crm-btn crm-btn-primary crm-btn-sm"><CalendarClock className="h-3.5 w-3.5" /> Schedule email</button>
+                <button disabled={deleting} onClick={() => setDomain(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null })} className="crm-btn crm-btn-ghost crm-btn-sm"><Shapes className="h-3.5 w-3.5" /> Set domain</button>
                 <button disabled={deleting} onClick={() => remove(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null }, count)} className="crm-btn crm-btn-danger crm-btn-sm"><Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Delete"}</button>
                 <button onClick={clear} className="crm-btn crm-btn-ghost crm-btn-sm" aria-label="Clear selection"><X className="h-3.5 w-3.5" /></button>
               </span>

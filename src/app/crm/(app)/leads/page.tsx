@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Download, Search, UserPlus } from "lucide-react";
+import { Download, Search, Shapes, UserPlus } from "lucide-react";
 import { requireUser } from "@/lib/crm/auth";
 import { q } from "@/lib/crm/db";
 import { LEAD_SELECT, type Lead } from "@/lib/crm/engine";
-import { leadWhere } from "@/lib/crm/leadQuery";
+import { leadWhere, NO_DOMAIN } from "@/lib/crm/leadQuery";
 import { channelStatus } from "@/lib/crm/messaging";
 import { SOURCES, STAGES } from "@/lib/crm/config";
 import { Empty, PageTitle } from "@/components/crm/ui";
@@ -25,12 +25,13 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
   const stage = one(sp.stage);
   const source = one(sp.source);
   const tag = one(sp.tag);
+  const domain = one(sp.domain);
   const sort = one(sp.sort) || "recent";
   // Old "?new=1" links now go to the dedicated Create lead page.
   if (one(sp.new) === "1") redirect("/crm/leads/new");
 
   const page = Math.max(1, Number(one(sp.page)) || 1);
-  const w = leadWhere({ q: term, stage, source, tag });
+  const w = leadWhere({ q: term, stage, source, tag, domain });
   const order = { recent: "l.created_at DESC", updated: "l.updated_at DESC", value: "l.value DESC", followup: "l.next_followup_at ASC NULLS LAST" }[sort] ?? "l.created_at DESC";
 
   const [leads, countRow, emailTemplates] = await Promise.all([
@@ -42,12 +43,12 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const pageHref = (p: number) => {
     const u = new URLSearchParams();
-    for (const [k, v] of Object.entries({ q: term, stage, source, tag, sort: sort === "recent" ? "" : sort })) if (v) u.set(k, v);
+    for (const [k, v] of Object.entries({ q: term, stage, source, tag, domain, sort: sort === "recent" ? "" : sort })) if (v) u.set(k, v);
     if (p > 1) u.set("page", String(p));
     const qs = u.toString();
     return `/crm/leads${qs ? `?${qs}` : ""}`;
   };
-  const filtered = Boolean(term || stage || source || tag);
+  const filtered = Boolean(term || stage || source || tag || domain);
 
   return (
     <>
@@ -56,6 +57,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
         sub={`${total.toLocaleString("en-IN")} ${filtered ? "matching" : "total"}${pages > 1 ? ` · page ${page} of ${pages}` : ""} · tick leads to schedule an email or delete`}
         actions={
           <>
+            <Link href="/crm/domains" className="crm-btn crm-btn-ghost"><Shapes className="h-4 w-4" /> Domains</Link>
             <ImportCsv />
             <Link href="/crm/leads/new" className="crm-btn crm-btn-primary"><UserPlus className="h-4 w-4" /> Create lead</Link>
             <a href="/crm/export" className="crm-btn crm-btn-ghost"><Download className="h-4 w-4" /> Export</a>
@@ -83,24 +85,31 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
           <option value="followup">Next follow-up</option>
         </select>
         {tag && <input type="hidden" name="tag" value={tag} />}
+        {domain && <input type="hidden" name="domain" value={domain} />}
         <button className="crm-btn crm-btn-ghost">Filter</button>
         {filtered && <Link href="/crm/leads" className="crm-btn crm-btn-ghost">Clear</Link>}
       </form>
+
+      {domain && (
+        <p className="mb-3 text-sm text-[var(--crm-ink-2)]">
+          Domain: <span className="font-semibold text-[var(--crm-ink)]">{domain === NO_DOMAIN ? "No domain set" : domain}</span> · {total.toLocaleString("en-IN")} lead{total === 1 ? "" : "s"} · <Link href="/crm/domains" className="underline">all domains</Link>
+        </p>
+      )}
 
       {leads.length === 0 ? (
         <Empty>{filtered ? "No leads match those filters." : "No leads yet — website enquiries will appear here automatically, or use “Create lead”."}</Empty>
       ) : (
         <>
           <LeadsTable
-            key={`${page}-${term}-${stage}-${source}-${tag}-${sort}`}
+            key={`${page}-${term}-${stage}-${source}-${tag}-${domain}-${sort}`}
             leads={leads.map((l) => ({
-              id: l.id, name: l.name, business: l.business, email: l.email, phone: l.phone, service: l.service, source: l.source,
+              id: l.id, name: l.name, business: l.business, domain: l.domain, email: l.email, phone: l.phone, service: l.service, source: l.source,
               stage: l.stage, value: l.value, tags: l.tags, agent_name: l.agent_name,
               next_followup_at: l.next_followup_at ? new Date(l.next_followup_at).toISOString() : null,
               created_at: new Date(l.created_at).toISOString(),
             }))}
             total={total}
-            filter={{ q: term, stage, source, tag }}
+            filter={{ q: term, stage, source, tag, domain }}
             emailTemplates={emailTemplates}
             emailReady={channelStatus().email}
           />
