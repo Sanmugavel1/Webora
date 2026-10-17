@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
-import { hashPassword, login, logout, requireUser } from "@/lib/crm/auth";
+import { changePassword, hashPassword, login, logout, makeResetToken, requireUser, resetPasswordWithToken } from "@/lib/crm/auth";
 import { q, q1 } from "@/lib/crm/db";
 import { leadWhere, type LeadFilter } from "@/lib/crm/leadQuery";
-import { channelStatus, renderTemplate } from "@/lib/crm/messaging";
+import { channelStatus, renderTemplate, sendEmail } from "@/lib/crm/messaging";
+import { PUBLIC_SITE_URL } from "@/lib/crm/config";
 import { CHANNELS, STAGE_IDS, TRIGGERS, type SequenceStep, type StageId } from "@/lib/crm/config";
 import {
   changeStage,
@@ -42,6 +43,59 @@ export async function loginAction(_prev: { error: string; email: string } | null
   redirect("/crm");
 }
 
+type PwState = { error: string; ok?: string } | null;
+
+function checkNewPassword(fd: FormData): { error: string } | { next: string } {
+  const next = String(fd.get("new_password") ?? "");
+  if (next.length < 8) return { error: "New password must be at least 8 characters." };
+  if (next !== String(fd.get("confirm_password") ?? "")) return { error: "The two new passwords don't match." };
+  return { next };
+}
+
+export async function changePasswordAction(_prev: PwState, fd: FormData): Promise<PwState> {
+  const user = await requireUser();
+  const check = checkNewPassword(fd);
+  if ("error" in check) return { error: check.error };
+  const current = String(fd.get("current_password") ?? "");
+  if (current === check.next) return { error: "Pick a password different from the current one." };
+  if (!(await changePassword(user.id, current, check.next))) return { error: "Current password is wrong." };
+  return { error: "", ok: "Password changed. Use the new one next time you sign in." };
+}
+
+/** Emails a 30-minute reset link. Same reply whether or not the email exists. */
+export async function requestPasswordResetAction(_prev: PwState, fd: FormData): Promise<PwState> {
+  const email = str(fd, "email").toLowerCase();
+  if (!email.includes("@")) return { error: "Enter your CRM email address." };
+  if (!channelStatus().email) return { error: "Email isn't set up for the CRM, so a reset link can't be sent. Ask the owner to set a new password." };
+  const r = await makeResetToken(email);
+  if (r) {
+    const link = `${PUBLIC_SITE_URL}/crm/reset?token=${encodeURIComponent(r.token)}`;
+    await sendEmail(
+      r.user.email,
+      "Reset your WEBORA CRM password",
+      `Hi ${r.user.name},\n\nSomeone (hopefully you) asked to reset the password for the WEBORA CRM.\n\nSet a new password here (link works for ${r.minutes} minutes, once):\n${link}\n\nIf you didn't ask for this, just ignore this email — your password stays the same.\n\n— WEBORA CRM`,
+    ).catch((e) => console.error("reset email failed", e));
+  }
+  return { error: "", ok: `If ${email} has a CRM account, a reset link is on its way. Check the inbox (and spam).` };
+}
+
+export async function resetPasswordAction(_prev: PwState, fd: FormData): Promise<PwState> {
+  const check = checkNewPassword(fd);
+  if ("error" in check) return { error: check.error };
+  if (!(await resetPasswordWithToken(String(fd.get("token") ?? ""), check.next))) {
+    return { error: "This reset link has expired or was already used. Request a new one from the sign-in page." };
+  }
+  return { error: "", ok: "Password updated — you can sign in now." };
+}
+
+export async function setMemberPasswordAction(id: number, password: string) {
+  const user = await requireUser();
+  if (user.role !== "owner") return { error: "Only the owner can do this." };
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  await q("UPDATE crm_users SET password_hash = $2 WHERE id = $1 AND role <> 'owner'", [id, await hashPassword(password)]);
+  return { error: "" };
+}
+
 export async function logoutAction() {
   await logout();
   redirect("/crm/login");
@@ -70,7 +124,7 @@ export async function createLeadAction(fd: FormData) {
   );
   await runDueFollowups({ leadId: id });
   refresh(id);
-  redirect(`/crm/leads/${id}`);
+  redirect(str(fd, "then") === "another" ? `/crm/leads/new?added=${id}` : `/crm/leads/${id}`);
 }
 
 export async function updateLeadAction(id: number, fd: FormData) {
@@ -447,12 +501,10 @@ export async function addUserAction(_prev: { error: string; ok?: string } | null
 export async function updateProfileAction(_prev: { error: string; ok?: string } | null, fd: FormData) {
   const user = await requireUser();
   const name = str(fd, "name");
-  const password = String(fd.get("password") ?? "");
-  if (password && password.length < 8) return { error: "New password must be at least 8 characters." };
-  if (name) await q("UPDATE crm_users SET name = $2 WHERE id = $1", [user.id, name]);
-  if (password) await q("UPDATE crm_users SET password_hash = $2 WHERE id = $1", [user.id, await hashPassword(password)]);
+  if (!name) return { error: "Name can't be empty." };
+  await q("UPDATE crm_users SET name = $2 WHERE id = $1", [user.id, name]);
   refresh();
-  return { error: "", ok: password ? "Saved — password changed." : "Saved." };
+  return { error: "", ok: "Saved." };
 }
 
 export async function removeUserAction(id: number) {

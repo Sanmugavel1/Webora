@@ -115,3 +115,39 @@ export async function requireUser() {
 export async function listUsers() {
   return q<CrmUser & { created_at: Date }>("SELECT id, name, email, role, created_at FROM crm_users ORDER BY id");
 }
+
+/** Changes a signed-in user's password after checking their current one. */
+export async function changePassword(userId: number, current: string, next: string) {
+  const row = await q1<{ password_hash: string }>("SELECT password_hash FROM crm_users WHERE id = $1", [userId]);
+  if (!row || !(await verifyPassword(current, row.password_hash))) return false;
+  await q("UPDATE crm_users SET password_hash = $2 WHERE id = $1", [userId, await hashPassword(next)]);
+  return true;
+}
+
+const RESET_MINUTES = 30;
+
+/**
+ * Password-reset links are signed with the user's current password hash, so a
+ * link stops working the moment the password changes (one use) or after 30 min.
+ */
+export async function makeResetToken(email: string) {
+  const row = await q1<{ id: number; name: string; email: string; password_hash: string }>(
+    "SELECT id, name, email, password_hash FROM crm_users WHERE email = $1",
+    [email.trim().toLowerCase()],
+  );
+  if (!row) return null;
+  const payload = `${row.id}.${Date.now() + RESET_MINUTES * 60_000}`;
+  return { user: row, token: `${payload}.${sign(`reset.${payload}.${row.password_hash}`)}`, minutes: RESET_MINUTES };
+}
+
+export async function resetPasswordWithToken(token: string, next: string) {
+  const [id, exp, mac] = token.split(".");
+  if (!id || !exp || !mac || Number(exp) < Date.now()) return false;
+  const row = await q1<{ password_hash: string }>("SELECT password_hash FROM crm_users WHERE id = $1", [Number(id) || 0]);
+  if (!row) return false;
+  const expected = Buffer.from(sign(`reset.${id}.${exp}.${row.password_hash}`));
+  const given = Buffer.from(mac);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return false;
+  await q("UPDATE crm_users SET password_hash = $2 WHERE id = $1", [Number(id), await hashPassword(next)]);
+  return true;
+}

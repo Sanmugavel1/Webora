@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Download, Search } from "lucide-react";
-import { listUsers, requireUser } from "@/lib/crm/auth";
+import { redirect } from "next/navigation";
+import { Download, Search, UserPlus } from "lucide-react";
+import { requireUser } from "@/lib/crm/auth";
 import { q } from "@/lib/crm/db";
 import { LEAD_SELECT, type Lead } from "@/lib/crm/engine";
 import { leadWhere } from "@/lib/crm/leadQuery";
@@ -8,9 +9,7 @@ import { channelStatus } from "@/lib/crm/messaging";
 import { SOURCES, STAGES } from "@/lib/crm/config";
 import { Empty, PageTitle } from "@/components/crm/ui";
 import { LeadsTable } from "@/components/crm/LeadsTable";
-import { LeadFields } from "@/components/crm/LeadFields";
 import { ImportCsv } from "@/components/crm/ImportCsv";
-import { createLeadAction } from "../../actions";
 
 export const metadata = { title: "Leads" };
 // CSV import batches and bulk scheduling run as server actions on this page.
@@ -27,15 +26,16 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
   const source = one(sp.source);
   const tag = one(sp.tag);
   const sort = one(sp.sort) || "recent";
+  // Old "?new=1" links now go to the dedicated Create lead page.
+  if (one(sp.new) === "1") redirect("/crm/leads/new");
 
   const page = Math.max(1, Number(one(sp.page)) || 1);
   const w = leadWhere({ q: term, stage, source, tag });
   const order = { recent: "l.created_at DESC", updated: "l.updated_at DESC", value: "l.value DESC", followup: "l.next_followup_at ASC NULLS LAST" }[sort] ?? "l.created_at DESC";
 
-  const [leads, countRow, users, emailTemplates] = await Promise.all([
+  const [leads, countRow, emailTemplates] = await Promise.all([
     q<Lead>(`${LEAD_SELECT} ${w.sql} ORDER BY ${order}, l.id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, w.params),
     q<{ n: number }>(`SELECT count(*)::int AS n FROM crm_leads l ${w.sql}`, w.params),
-    listUsers(),
     q<{ id: number; name: string; subject: string; body: string }>("SELECT id, name, subject, body FROM crm_templates WHERE channel = 'email' ORDER BY name"),
   ]);
   const total = countRow[0]?.n ?? 0;
@@ -57,21 +57,11 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
         actions={
           <>
             <ImportCsv />
+            <Link href="/crm/leads/new" className="crm-btn crm-btn-primary"><UserPlus className="h-4 w-4" /> Create lead</Link>
             <a href="/crm/export" className="crm-btn crm-btn-ghost"><Download className="h-4 w-4" /> Export</a>
           </>
         }
       />
-
-      <details open={one(sp.new) === "1"} className="crm-card mb-4">
-        <summary className="flex items-center justify-between p-4 text-sm font-semibold">
-          <span>+ Add a lead</span>
-          <span className="text-xs font-normal text-[var(--crm-ink-3)]">Starts any “new lead” follow-up automatically</span>
-        </summary>
-        <form action={createLeadAction} className="border-t border-[var(--crm-line)] p-4 sm:p-5">
-          <LeadFields users={users} />
-          <div className="mt-4 flex justify-end"><button className="crm-btn crm-btn-primary">Save lead</button></div>
-        </form>
-      </details>
 
       <form className="mb-4 flex flex-wrap gap-2">
         <label className="relative min-w-0 flex-1 basis-56">
@@ -98,7 +88,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
       </form>
 
       {leads.length === 0 ? (
-        <Empty>{filtered ? "No leads match those filters." : "No leads yet — website enquiries will appear here automatically, or add one above."}</Empty>
+        <Empty>{filtered ? "No leads match those filters." : "No leads yet — website enquiries will appear here automatically, or use “Create lead”."}</Empty>
       ) : (
         <>
           <LeadsTable

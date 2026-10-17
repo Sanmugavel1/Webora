@@ -2,7 +2,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { listUsers, requireUser } from "@/lib/crm/auth";
 import { channelStatus } from "@/lib/crm/messaging";
 import { Card, PageTitle } from "@/components/crm/ui";
-import { AddUserForm, ProfileForm, RemoveUser } from "@/components/crm/SettingsForms";
+import { AddUserForm, ChangePasswordForm, ProfileForm, RemoveUser, SetMemberPassword } from "@/components/crm/SettingsForms";
 
 export const metadata = { title: "Settings" };
 
@@ -19,6 +19,11 @@ export default async function SettingsPage() {
           <ProfileForm name={user.name} />
         </Card>
 
+        <Card title="Change password">
+          <p className="mb-3 text-xs text-[var(--crm-ink-3)]">Signed in as {user.email}. Forgot it? Use “Forgot password?” on the sign-in page to get a reset link by email.</p>
+          <ChangePasswordForm />
+        </Card>
+
         <Card title="Team">
           <ul className="mb-4 divide-y divide-[var(--crm-line)]">
             {users.map((u) => (
@@ -28,7 +33,9 @@ export default async function SettingsPage() {
                   <span className="block font-medium">{u.name}{u.id === user.id && " (you)"}</span>
                   <span className="block truncate text-xs text-[var(--crm-ink-3)]">{u.email} · {u.role}</span>
                 </span>
-                {user.role === "owner" && u.role !== "owner" && <RemoveUser id={u.id} name={u.name} />}
+                {user.role === "owner" && u.role !== "owner" && (
+                  <span className="flex gap-1.5"><SetMemberPassword id={u.id} name={u.name} /><RemoveUser id={u.id} name={u.name} /></span>
+                )}
               </li>
             ))}
           </ul>
@@ -58,7 +65,7 @@ export default async function SettingsPage() {
             />
           </div>
           <p className="mt-4 text-xs text-[var(--crm-ink-3)]">
-            Follow-ups are checked every time anyone opens the CRM, instantly when a new lead arrives, and once a day at 9 AM as a backup.
+            Follow-ups are checked every time anyone opens the CRM, instantly when a new lead arrives, and at 9 AM, 1 PM and 6 PM daily as a backup.
           </p>
         </Card>
       </div>

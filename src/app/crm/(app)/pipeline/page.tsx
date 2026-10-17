@@ -31,7 +31,7 @@ export default async function PipelinePage() {
       <PageTitle
         title="Pipeline"
         sub="Drag a card to move it. Moving past Contacted stops the nurture sequence; Proposal and Won start their own follow-ups."
-        actions={<Link href="/crm/leads?new=1" className="crm-btn crm-btn-primary">+ Add lead</Link>}
+        actions={<Link href="/crm/leads/new" className="crm-btn crm-btn-primary">+ Create lead</Link>}
       />
       <Kanban
         leads={leads.map((l) => ({

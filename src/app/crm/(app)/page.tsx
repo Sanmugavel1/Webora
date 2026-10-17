@@ -59,7 +59,7 @@ export default async function Dashboard() {
       <PageTitle
         title={`${greeting}, ${user.name.split(" ")[0]}`}
         sub="Here's what's moving in the WEBORA pipeline."
-        actions={<Link href="/crm/leads?new=1" className="crm-btn crm-btn-primary">+ Add lead</Link>}
+        actions={<Link href="/crm/leads/new" className="crm-btn crm-btn-primary">+ Create lead</Link>}
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -122,7 +122,7 @@ export default async function Dashboard() {
 
       <Card title="Recent activity" className="mt-4">
         {recent.length === 0 ? (
-          <Empty href="/crm/leads?new=1" cta="Add your first lead">Activity appears here as leads come in and follow-ups go out.</Empty>
+          <Empty href="/crm/leads/new" cta="Add your first lead">Activity appears here as leads come in and follow-ups go out.</Empty>
         ) : (
           <ul className="divide-y divide-[var(--crm-line)]">
             {recent.map((a) => (
