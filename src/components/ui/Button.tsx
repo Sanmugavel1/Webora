@@ -45,6 +45,7 @@ interface ClickButtonProps extends ButtonBaseProps {
   href?: never;
   onClick?: () => void;
   type?: "button" | "submit";
+  disabled?: boolean;
 }
 
 type ButtonProps = LinkButtonProps | ClickButtonProps;
@@ -59,6 +60,7 @@ export function Button({
   onClick,
   type = "button",
   external = false,
+  ...rest
 }: ButtonProps) {
   const classes = cn(baseClasses, VARIANT_CLASSES[variant], className);
   const style = variant === "primary" ? { background: "var(--gradient-primary)" } : undefined;
@@ -90,7 +92,7 @@ export function Button({
   }
 
   return (
-    <button type={type} onClick={onClick} className={classes} style={style}>
+    <button type={type} onClick={onClick} disabled={"disabled" in rest ? rest.disabled : undefined} className={cn(classes, "disabled:opacity-60")} style={style}>
       {content}
     </button>
   );

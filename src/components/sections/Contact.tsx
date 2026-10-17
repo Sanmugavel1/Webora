@@ -17,7 +17,7 @@ import { PROJECT_TYPES } from "@/lib/data/contact";
 const inputClasses =
   "w-full min-h-11 rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-mist/40 transition-colors focus:border-blue";
 
-type Status = "idle" | "sent";
+type Status = "idle" | "sending" | "sent" | "mailto";
 
 function buildMailtoLink(data: Record<string, string>) {
   const subject = `New project inquiry from ${data.name || "a visitor"}`;
@@ -38,13 +38,38 @@ function buildMailtoLink(data: Record<string, string>) {
 export function Contact() {
   const [status, setStatus] = useState<Status>("idle");
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [error, setError] = useState("");
+
+  // Enquiries go straight into the WEBORA CRM; if that fails for any reason we
+  // fall back to the old pre-filled email so no lead is ever lost.
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const data = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
-
-    window.location.href = buildMailtoLink(data);
-    setStatus("sent");
+    if (!data.name?.trim() || (!data.email?.trim() && !data.phone?.trim())) {
+      setError("Please add your name and an email or phone number.");
+      return;
+    }
+    setError("");
+    setStatus("sending");
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.status === 400) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error || "Please check your details.");
+        setStatus("idle");
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      setStatus("sent");
+    } catch {
+      window.location.href = buildMailtoLink(data);
+      setStatus("mailto");
+    }
   };
 
   return (
@@ -124,6 +149,25 @@ export function Contact() {
               <div className="glass-dark flex min-h-[420px] flex-col items-center justify-center rounded-2xl p-10 text-center">
                 <CheckCircle2 className="h-12 w-12 text-blue-soft" strokeWidth={1.5} />
                 <h3 className="font-display mt-5 text-2xl font-semibold text-white">
+                  Thanks — we&rsquo;ve got your request.
+                </h3>
+                <p className="mt-2 max-w-sm text-sm leading-relaxed text-mist">
+                  Our team will reach out shortly on WhatsApp or email. Want to talk now?{" "}
+                  <a
+                    href={WHATSAPP_LINK}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-soft underline underline-offset-2"
+                  >
+                    Message us on WhatsApp
+                  </a>
+                  .
+                </p>
+              </div>
+            ) : status === "mailto" ? (
+              <div className="glass-dark flex min-h-[420px] flex-col items-center justify-center rounded-2xl p-10 text-center">
+                <CheckCircle2 className="h-12 w-12 text-blue-soft" strokeWidth={1.5} />
+                <h3 className="font-display mt-5 text-2xl font-semibold text-white">
                   Your email app should be open.
                 </h3>
                 <p className="mt-2 max-w-sm text-sm leading-relaxed text-mist">
@@ -187,8 +231,13 @@ export function Contact() {
                   />
                 </Field>
 
-                <Button type="submit" variant="primary" className="w-full justify-center sm:w-auto">
-                  SEND PROJECT REQUEST
+                {/* Honeypot: hidden from people, filled by spam bots. */}
+                <input type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
+
+                {error && <p className="text-sm text-rose-300" role="alert">{error}</p>}
+
+                <Button type="submit" variant="primary" disabled={status === "sending"} className="w-full justify-center sm:w-auto">
+                  {status === "sending" ? "SENDING…" : "SEND PROJECT REQUEST"}
                 </Button>
               </form>
             )}

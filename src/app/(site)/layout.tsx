@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
 import { SITE_URL, SOCIAL_LINKS } from "@/lib/constants";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
