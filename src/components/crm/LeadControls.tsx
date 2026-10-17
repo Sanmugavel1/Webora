@@ -7,8 +7,8 @@ import { STAGES, type StageId } from "@/lib/crm/config";
 import { mailtoLink, renderTemplate, waLink } from "@/lib/crm/template";
 import { cn } from "@/lib/utils";
 
-type LeadLite = { id: number; name: string; business: string; service: string; agent_name: string | null; phone: string; email: string; stage: StageId };
-type Tpl = { id: number; name: string; channel: string; subject: string; body: string };
+type LeadLite = { id: number; name: string; business: string; domain: string; service: string; agent_name: string | null; phone: string; email: string; stage: StageId };
+type Tpl = { id: number; name: string; channel: string; subject: string; body: string; domain: string };
 
 export function StageBar({ id, stage }: { id: number; stage: StageId }) {
   const [pending, start] = useTransition();
@@ -58,7 +58,9 @@ export function Composer({ lead, templates, emailReady }: { lead: LeadLite; temp
   const [body, setBody] = useState("");
   const [note, setNote] = useState("");
   const [pending, start] = useTransition();
-  const list = templates.filter((t) => t.channel === channel);
+  // This lead's domain formats first, then the all-domain ones.
+  const own = (t: Tpl) => !!lead.domain && t.domain.toLowerCase() === lead.domain.toLowerCase();
+  const list = templates.filter((t) => t.channel === channel && (!t.domain || own(t))).sort((a, b) => Number(own(b)) - Number(own(a)));
   const target = channel === "email" ? lead.email : lead.phone;
 
   function applyTemplate(id: string) {
@@ -97,7 +99,7 @@ export function Composer({ lead, templates, emailReady }: { lead: LeadLite; temp
         </div>
         <select onChange={(e) => { applyTemplate(e.target.value); e.target.value = ""; }} defaultValue="" className="crm-input w-auto min-w-0 flex-1" aria-label="Insert message format">
           <option value="" disabled>Insert a message format…</option>
-          {list.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          {list.map((t) => <option key={t.id} value={t.id}>{t.domain ? `${t.domain} · ` : ""}{t.name}</option>)}
         </select>
       </div>
       {channel === "email" && <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="crm-input mb-2" />}

@@ -37,7 +37,7 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
       [id],
     ),
     listUsers(),
-    q<{ id: number; name: string; channel: string; subject: string; body: string }>("SELECT id, name, channel, subject, body FROM crm_templates ORDER BY name"),
+    q<{ id: number; name: string; channel: string; subject: string; body: string; domain: string }>("SELECT id, name, channel, subject, body, domain FROM crm_templates ORDER BY name"),
     q<{ id: number; name: string; active: boolean }>("SELECT id, name, active FROM crm_sequences ORDER BY name"),
     q<{ sequence_id: number; name: string; status: string; step_index: number; next_run_at: Date | null; stopped_reason: string; steps: SequenceStep[] }>(
       "SELECT e.sequence_id, s.name, e.status, e.step_index, e.next_run_at, e.stopped_reason, s.steps FROM crm_enrollments e JOIN crm_sequences s ON s.id = e.sequence_id WHERE e.lead_id = $1 ORDER BY e.enrolled_at DESC",
@@ -49,7 +49,7 @@ export default async function LeadPage({ params }: PageProps<"/crm/leads/[id]">)
     ),
     domainNames(),
   ]);
-  const lite = { id: lead.id, name: lead.name, business: lead.business, service: lead.service, agent_name: lead.agent_name, phone: lead.phone, email: lead.email, stage: lead.stage };
+  const lite = { id: lead.id, name: lead.name, business: lead.business, domain: lead.domain, service: lead.service, agent_name: lead.agent_name, phone: lead.phone, email: lead.email, stage: lead.stage };
   const notEnrolled = sequences.filter((s) => s.active && !enrollments.some((e) => e.sequence_id === s.id && e.status === "active"));
 
   return (

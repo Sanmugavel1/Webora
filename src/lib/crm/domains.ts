@@ -1,7 +1,7 @@
 import "server-only";
 import { q } from "./db";
 
-export type DomainRow = { domain: string; leads: number; open: number; won: number; value: number };
+export type DomainRow = { domain: string; leads: number; open: number; won: number; value: number; formats: number };
 
 /**
  * Every domain with its lead stats: domains that leads use, plus ones added by
@@ -19,7 +19,8 @@ export function listDomains() {
       FROM crm_leads WHERE trim(domain) <> '' GROUP BY 1
     )
     SELECT coalesce(g.domain, d.name) AS domain, coalesce(g.leads, 0) AS leads, coalesce(g.open, 0) AS open,
-      coalesce(g.won, 0) AS won, coalesce(g.value, 0) AS value
+      coalesce(g.won, 0) AS won, coalesce(g.value, 0) AS value,
+      (SELECT count(*)::int FROM crm_templates t WHERE t.domain <> '' AND lower(t.domain) = coalesce(g.k, lower(d.name))) AS formats
     FROM g FULL JOIN crm_domains d ON lower(d.name) = g.k
     ORDER BY leads DESC, domain`);
 }

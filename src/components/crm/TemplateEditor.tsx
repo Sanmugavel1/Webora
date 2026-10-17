@@ -6,10 +6,10 @@ import { TEMPLATE_VARIABLES } from "@/lib/crm/config";
 import { renderTemplate } from "@/lib/crm/template";
 import { useRouter } from "next/navigation";
 
-type Tpl = { id: number | null; name: string; channel: string; subject: string; body: string };
+type Tpl = { id: number | null; name: string; channel: string; subject: string; body: string; domain: string };
 const SAMPLE = { name: "Arjun Menon", business: "Spice Route Cafe", service: "Business Website", agent_name: "Naveen" };
 
-export function TemplateEditor({ initial }: { initial: Tpl }) {
+export function TemplateEditor({ initial, domains }: { initial: Tpl; domains: string[] }) {
   const router = useRouter();
   const [t, setT] = useState(initial);
   const [err, setErr] = useState("");
@@ -43,6 +43,12 @@ export function TemplateEditor({ initial }: { initial: Tpl }) {
             </select>
           </label>
         </div>
+        <label className="block">
+          <span className="crm-label">Domain</span>
+          <input name="domain" list="tpl-domains" value={t.domain} onChange={(e) => setT({ ...t, domain: e.target.value })} className="crm-input" placeholder="Empty = all domains (general format)" />
+          <datalist id="tpl-domains">{domains.map((d) => <option key={d} value={d} />)}</datalist>
+          <span className="mt-1 block text-xs text-[var(--crm-ink-3)]">e.g. Gym — then it’s offered for Gym leads. Leave empty to use it for every domain.</span>
+        </label>
         {t.channel === "email" && (
           <label className="block">
             <span className="crm-label">Subject</span>

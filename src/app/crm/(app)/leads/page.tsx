@@ -40,7 +40,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
     q<{ n: number }>(`SELECT count(*)::int AS n FROM crm_leads l ${w.sql}`, w.params),
     q<{ id: number; name: string; subject: string; body: string }>("SELECT id, name, subject, body FROM crm_templates WHERE channel = 'email' ORDER BY name"),
     listDomains(),
-    q<{ id: number; name: string; body: string }>("SELECT id, name, body FROM crm_templates WHERE channel = 'whatsapp' ORDER BY name"),
+    q<{ id: number; name: string; body: string; domain: string }>("SELECT id, name, body, domain FROM crm_templates WHERE channel = 'whatsapp' ORDER BY lower(domain), name"),
   ]);
   domains.sort((a, b) => a.domain.localeCompare(b.domain));
   const total = countRow[0]?.n ?? 0;

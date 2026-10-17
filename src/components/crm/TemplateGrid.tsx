@@ -9,7 +9,7 @@ import { renderTemplate } from "@/lib/crm/template";
 import { ChannelBadge } from "./ui";
 import { cn } from "@/lib/utils";
 
-type Tpl = { id: number; name: string; channel: string; subject: string; body: string; used: number };
+type Tpl = { id: number; name: string; channel: string; subject: string; body: string; domain: string; used: number };
 const SAMPLE = { name: "Arjun", business: "Spice Route Cafe", service: "Business Website" };
 
 /** Format cards with a "Select" mode for deleting several at once. */
@@ -70,6 +70,7 @@ export function TemplateGrid({ templates }: { templates: Tpl[] }) {
               <div className="mb-2 flex items-center gap-2">
                 {selecting && <input type="checkbox" readOnly checked={sel.has(t.id)} tabIndex={-1} className="pointer-events-none h-4 w-4 accent-[var(--color-blue)]" />}
                 <ChannelBadge channel={t.channel} />
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium", t.domain ? "bg-[var(--color-blue)]/15 text-[#8fbcff]" : "bg-white/5 text-[var(--crm-ink-3)]")}>{t.domain || "All domains"}</span>
                 <span className="ml-auto text-[11px] text-[var(--crm-ink-3)]">{t.used ? `in ${t.used} sequence step${t.used === 1 ? "" : "s"}` : "not automated"}</span>
               </div>
               <p className="font-medium">{t.name}</p>

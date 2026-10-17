@@ -19,7 +19,7 @@ function pool() {
 }
 
 /** Bump whenever SCHEMA below changes, so already-set-up databases run it once more. */
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS crm_meta (version INTEGER NOT NULL);
@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS crm_templates (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Domain a format is written for ('' = every domain).
+ALTER TABLE crm_templates ADD COLUMN IF NOT EXISTS domain TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS crm_sequences (
   id SERIAL PRIMARY KEY,

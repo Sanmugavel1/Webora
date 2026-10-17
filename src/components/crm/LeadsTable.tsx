@@ -29,7 +29,7 @@ export type LeadRow = {
 };
 type Filter = { q: string; stage: string; source: string; tag: string; domain: string };
 type Tpl = { id: number; name: string; subject: string; body: string };
-type WaTpl = { id: number; name: string; body: string };
+type WaTpl = { id: number; name: string; body: string; domain: string };
 
 const WA_KEY = "crm-wa-format";
 const waListeners = new Set<() => void>();
@@ -47,7 +47,13 @@ const defaultDay = () => (new Date(Date.now() + 5.5 * 3600_000).getUTCHours() < 
 export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, emailReady, domains }: { leads: LeadRow[]; total: number; filter: Filter; emailTemplates: Tpl[]; waTemplates: WaTpl[]; emailReady: boolean; domains: string[] }) {
   // The chosen WhatsApp format is remembered on this device.
   const saved = useSyncExternalStore(subscribeWa, readWa, () => "");
-  const waTpl = waTemplates.find((t) => String(t.id) === saved) ?? null;
+  // Filtered to one domain → only that domain's formats plus the all-domain ones.
+  const waShown = filter.domain && filter.domain !== "none"
+    ? waTemplates.filter((t) => !t.domain || t.domain.toLowerCase() === filter.domain.toLowerCase())
+    : waTemplates;
+  const waGroups = [...waShown.reduce((m, t) => m.set(t.domain, [...(m.get(t.domain) ?? []), t]), new Map<string, WaTpl[]>())]
+    .sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)));
+  const waTpl = waShown.find((t) => String(t.id) === saved) ?? null;
   const waId = waTpl ? saved : "";
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
@@ -105,9 +111,14 @@ export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, 
         <span className="font-medium">WhatsApp format</span>
         <select value={waId} onChange={(e) => pickWa(e.target.value)} className="crm-input w-auto min-w-48" aria-label="WhatsApp format">
           <option value="">Just “Hi name,”</option>
-          {waTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          {waGroups.map(([d, list]) => (
+            <optgroup key={d || "all"} label={d ? `${d} formats` : "All-domain formats"}>
+              {list.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </optgroup>
+          ))}
         </select>
-        <span className="text-xs text-[var(--crm-ink-3)]">Tap 💬 on a lead → WhatsApp opens with this message ready, and the lead moves to Contacted. Or tick leads → “Send WhatsApp” to go one after another.</span>
+        <Link href={filter.domain && filter.domain !== "none" ? `/crm/templates/new?domain=${encodeURIComponent(filter.domain)}` : "/crm/templates/new"} className="text-xs text-[#8fbcff] hover:underline">+ new format</Link>
+        <span className="text-xs text-[var(--crm-ink-3)]">Tap 💬 on a lead → pick a format (this one is marked “chosen”) → WhatsApp opens with it ready, and the lead moves to Contacted. Or tick leads → “Send WhatsApp” to go one after another.</span>
       </div>
 
       <div className="crm-card hidden overflow-x-auto md:block">
@@ -139,7 +150,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, 
                 <td suppressHydrationWarning className={l.next_followup_at && new Date(l.next_followup_at) < new Date() ? "text-amber-300" : "text-[var(--crm-ink-2)]"}>{fmtDate(l.next_followup_at, true)}</td>
                 <td suppressHydrationWarning className="text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</td>
                 <td className="whitespace-nowrap">
-                  {l.phone && <WhatsAppLink lead={l} tpl={waTpl} className="inline-flex rounded p-1 text-[#25d366] hover:bg-[#25d366]/10" />}
+                  {l.phone && <WhatsAppLink lead={l} tpl={waTpl} all={waTemplates} className="inline-flex rounded p-1 text-[#25d366] hover:bg-[#25d366]/10" />}
                   <Link href={`/crm/leads/${l.id}#edit`} className="inline-flex rounded p-1 text-[var(--crm-ink-3)] hover:bg-white/5 hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`} title="Edit lead">
                     <Pencil className="h-4 w-4" />
                   </Link>
@@ -165,7 +176,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, 
               </span>
               <span suppressHydrationWarning className="text-xs text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</span>
             </Link>
-            {l.phone && <WhatsAppLink lead={l} tpl={waTpl} className="rounded p-1 text-[#25d366]" />}
+            {l.phone && <WhatsAppLink lead={l} tpl={waTpl} all={waTemplates} className="rounded p-1 text-[#25d366]" />}
             <Link href={`/crm/leads/${l.id}#edit`} className="rounded p-1 text-[var(--crm-ink-3)] hover:text-[var(--crm-ink)]" aria-label={`Edit ${l.name}`}>
               <Pencil className="h-4 w-4" />
             </Link>
@@ -226,22 +237,64 @@ function waMessage(lead: LeadRow, tpl: WaTpl | null) {
   return tpl ? renderTemplate(tpl.body, lead) : `Hi ${lead.name.split(" ")[0]}, `;
 }
 
-/** Opens the lead's WhatsApp chat with the chosen format filled in; a "New" lead moves to "Contacted". */
-function WhatsAppLink({ lead, tpl, className }: { lead: LeadRow; tpl: WaTpl | null; className: string }) {
+/**
+ * 💬 on a row: a small menu of formats for this lead (its domain's formats
+ * first, then all-domain ones). Picking one opens WhatsApp already filled in,
+ * and a "New" lead moves to "Contacted".
+ */
+function WhatsAppLink({ lead, tpl, all, className }: { lead: LeadRow; tpl: WaTpl | null; all: WaTpl[]; className: string }) {
   const router = useRouter();
-  const text = waMessage(lead, tpl);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const own = (t: WaTpl) => !!lead.domain && t.domain.toLowerCase() === lead.domain.toLowerCase();
+  const options = all.filter((t) => !t.domain || own(t)).sort((a, b) => Number(own(b)) - Number(own(a)));
+  if (tpl && !options.some((t) => t.id === tpl.id)) options.unshift(tpl);
+
+  function toggle(e: React.MouseEvent<HTMLButtonElement>) {
+    if (pos) return setPos(null);
+    const r = e.currentTarget.getBoundingClientRect();
+    // Fixed position so the table's scroll box can't clip it; flip up near the bottom.
+    const h = Math.min(320, 44 + (options.length + 1) * 40);
+    setPos({ top: r.bottom + h > window.innerHeight ? Math.max(8, r.top - h) : r.bottom + 4, left: Math.max(8, Math.min(r.right - 288, window.innerWidth - 296)) });
+  }
+
+  function item(t: WaTpl | null) {
+    const text = waMessage(lead, t);
+    return (
+      <a
+        key={t?.id ?? "hi"}
+        href={waLink(lead.phone, text)}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => { setPos(null); whatsappOpenedAction(lead.id, t ? text : "", t?.name).then(() => router.refresh(), () => {}); }}
+        className="block rounded-lg px-3 py-2 text-left hover:bg-white/10"
+        title={text}
+      >
+        <span className="flex items-center gap-2 text-sm">
+          {t?.name ?? "Just “Hi name,”"}
+          {t && t.id === tpl?.id && <span className="rounded bg-[#25d366]/15 px-1.5 text-[10px] text-[#7ee2a8]">chosen</span>}
+          {t?.domain && <span className="ml-auto text-[10px] text-[var(--crm-ink-3)]">{t.domain}</span>}
+        </span>
+        <span className="block truncate text-xs text-[var(--crm-ink-3)]">{text}</span>
+      </a>
+    );
+  }
+
   return (
-    <a
-      href={waLink(lead.phone, text)}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={() => whatsappOpenedAction(lead.id, tpl ? text : "", tpl?.name).then(() => router.refresh(), () => {})}
-      className={className}
-      aria-label={`WhatsApp ${lead.name}`}
-      title="Open WhatsApp chat (moves New → Contacted)"
-    >
-      <MessageCircle className="h-4 w-4" />
-    </a>
+    <>
+      <button onClick={toggle} className={className} aria-label={`WhatsApp ${lead.name}`} aria-expanded={!!pos} title="Choose a format and open WhatsApp (moves New → Contacted)">
+        <MessageCircle className="h-4 w-4" />
+      </button>
+      {pos && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setPos(null)} />
+          <div className="crm-card fixed z-50 max-h-80 w-72 overflow-y-auto p-1.5 shadow-2xl shadow-black/50" style={{ top: pos.top, left: pos.left, background: "var(--crm-panel-2)" }}>
+            <p className="px-3 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--crm-ink-3)]">WhatsApp {lead.name.split(" ")[0]} with…</p>
+            {options.map((t) => item(t))}
+            {item(null)}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

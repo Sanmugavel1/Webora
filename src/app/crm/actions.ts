@@ -208,16 +208,18 @@ export async function renameDomainAction(from: string, to: string) {
   const d = cleanDomain(to);
   if (!d) return { error: "Type the new name.", updated: 0 };
   const moved = await q("UPDATE crm_leads SET domain = $2, updated_at = now() WHERE lower(trim(domain)) = lower(trim($1)) RETURNING id", [from, d]);
+  await q("UPDATE crm_templates SET domain = $2 WHERE lower(domain) = lower(trim($1))", [from, d]);
   await q("DELETE FROM crm_domains WHERE lower(name) = lower(trim($1))", [from]);
   await q("INSERT INTO crm_domains (name) VALUES ($1) ON CONFLICT DO NOTHING", [d]);
   refresh();
   return { error: "", updated: moved.length };
 }
 
-/** Removes a domain; its leads stay, with no domain set. */
+/** Removes a domain; its leads stay with no domain set, and its formats become all-domain formats. */
 export async function deleteDomainAction(name: string) {
   await requireUser();
   const cleared = await q("UPDATE crm_leads SET domain = '', updated_at = now() WHERE lower(trim(domain)) = lower(trim($1)) RETURNING id", [name]);
+  await q("UPDATE crm_templates SET domain = '' WHERE lower(domain) = lower(trim($1))", [name]);
   await q("DELETE FROM crm_domains WHERE lower(name) = lower(trim($1))", [name]);
   refresh();
   return { cleared: cleared.length };
@@ -472,19 +474,22 @@ export async function saveTemplateAction(fd: FormData) {
   const name = str(fd, "name");
   const body = String(fd.get("body") ?? "").trim();
   if (!name || !body) throw new Error("Name and message are required");
+  const domain = cleanDomain(str(fd, "domain"));
+  await rememberDomains([domain]);
   if (id) {
-    await q("UPDATE crm_templates SET name=$2, channel=$3, subject=$4, body=$5, updated_at=now() WHERE id=$1", [
+    await q("UPDATE crm_templates SET name=$2, channel=$3, subject=$4, body=$5, domain=$6, updated_at=now() WHERE id=$1", [
       id,
       name,
       channel,
       str(fd, "subject"),
       body,
+      domain,
     ]);
   } else {
-    await q("INSERT INTO crm_templates (name, channel, subject, body) VALUES ($1,$2,$3,$4)", [name, channel, str(fd, "subject"), body]);
+    await q("INSERT INTO crm_templates (name, channel, subject, body, domain) VALUES ($1,$2,$3,$4,$5)", [name, channel, str(fd, "subject"), body, domain]);
   }
   refresh();
-  redirect("/crm/templates");
+  redirect(domain ? `/crm/templates?domain=${encodeURIComponent(domain)}` : "/crm/templates");
 }
 
 export async function deleteTemplateAction(id: number) {

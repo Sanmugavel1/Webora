@@ -7,7 +7,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { createDomainAction, deleteDomainAction, renameDomainAction } from "@/app/crm/actions";
 import { inr } from "@/lib/crm/format";
 
-type Row = { domain: string; leads: number; open: number; won: number; value: number };
+type Row = { domain: string; leads: number; open: number; won: number; value: number; formats?: number };
 
 const href = (d: string) => `/crm/leads?domain=${encodeURIComponent(d || "none")}`;
 const n = (v: number) => v.toLocaleString("en-IN");
@@ -69,7 +69,7 @@ export function DomainTable({ rows, blank }: { rows: Row[]; blank: Row | null })
           <thead>
             <tr>
               <th>Domain</th><th className="text-right">Leads</th><th className="hidden w-1/4 md:table-cell">Share</th>
-              <th className="text-right">Open</th><th className="hidden text-right sm:table-cell">Won</th><th className="hidden text-right sm:table-cell">Value</th><th className="w-20" />
+              <th className="text-right">Open</th><th className="hidden text-right sm:table-cell">Won</th><th className="hidden text-right sm:table-cell">Value</th><th className="text-right">Formats</th><th className="w-20" />
             </tr>
           </thead>
           <tbody>
@@ -90,6 +90,13 @@ export function DomainTable({ rows, blank }: { rows: Row[]; blank: Row | null })
                   <td className="text-right tabular-nums text-[var(--crm-ink-2)]">{n(r.open)}</td>
                   <td className="hidden text-right tabular-nums text-[var(--crm-ink-2)] sm:table-cell">{n(r.won)}</td>
                   <td className="hidden text-right tabular-nums text-[var(--crm-ink-2)] sm:table-cell">{r.value ? inr(r.value) : "—"}</td>
+                  <td className="whitespace-nowrap text-right">
+                    {r.domain && (
+                      <Link href={`/crm/templates?domain=${encodeURIComponent(r.domain)}`} className="text-[#8fbcff] hover:underline" title={`${r.domain} message formats`}>
+                        {r.formats ? `${r.formats} format${r.formats === 1 ? "" : "s"}` : "+ add"}
+                      </Link>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap text-right">
                     {r.domain && (
                       <>
@@ -114,6 +121,7 @@ export function DomainTable({ rows, blank }: { rows: Row[]; blank: Row | null })
               <td className="px-3 py-3 text-right tabular-nums">{n(total.open)}</td>
               <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{n(total.won)}</td>
               <td className="hidden px-3 py-3 text-right tabular-nums sm:table-cell">{total.value ? inr(total.value) : "—"}</td>
+              <td />
               <td />
             </tr>
           </tfoot>
