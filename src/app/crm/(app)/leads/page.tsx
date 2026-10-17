@@ -53,7 +53,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
     <>
       <PageTitle
         title="Leads"
-        sub={`${total.toLocaleString("en-IN")} ${filtered ? "matching" : "total"}${pages > 1 ? ` · page ${page} of ${pages}` : ""} · tick leads to schedule an email`}
+        sub={`${total.toLocaleString("en-IN")} ${filtered ? "matching" : "total"}${pages > 1 ? ` · page ${page} of ${pages}` : ""} · tick leads to schedule an email or delete`}
         actions={
           <>
             <ImportCsv />

@@ -161,6 +161,21 @@ export async function deleteLeadAction(id: number) {
   redirect("/crm/leads");
 }
 
+export async function deleteLeadsAction(input: { ids: number[] | null; filter: LeadFilter | null }) {
+  await requireUser();
+  let rows: { id: number }[];
+  if (input.filter) {
+    const w = leadWhere(input.filter);
+    rows = await q<{ id: number }>(`DELETE FROM crm_leads WHERE id IN (SELECT l.id FROM crm_leads l ${w.sql}) RETURNING id`, w.params);
+  } else {
+    const ids = (input.ids ?? []).map(Number).filter(Boolean);
+    if (!ids.length) return { deleted: 0 };
+    rows = await q<{ id: number }>("DELETE FROM crm_leads WHERE id = ANY($1::int[]) RETURNING id", [ids]);
+  }
+  refresh();
+  return { deleted: rows.length };
+}
+
 export async function moveStageAction(id: number, stage: StageId) {
   const user = await requireUser();
   if (!STAGE_IDS.includes(stage)) return;

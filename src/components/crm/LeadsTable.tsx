@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
-import { CalendarClock, X } from "lucide-react";
-import { scheduleEmailAction } from "@/app/crm/actions";
+import { useRouter } from "next/navigation";
+import { CalendarClock, Trash2, X } from "lucide-react";
+import { deleteLeadsAction, scheduleEmailAction } from "@/app/crm/actions";
 import { sourceLabel, type StageId } from "@/lib/crm/config";
 import { fmtDate, inr, timeAgo } from "@/lib/crm/format";
 import { renderTemplate } from "@/lib/crm/template";
@@ -38,6 +39,8 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
   const [open, setOpen] = useState(false);
+  const [deleting, startDelete] = useTransition();
+  const router = useRouter();
   const pageIds = leads.map((l) => l.id);
   const allOnPage = pageIds.length > 0 && pageIds.every((id) => sel.has(id));
   const count = allMatching ? total : sel.size;
@@ -52,6 +55,20 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
   }
   function clear() { setSel(new Set()); setAllMatching(false); setOpen(false); }
 
+  function remove(target: { ids: number[] | null; filter: Filter | null }, n: number, label?: string) {
+    const what = label ?? `${n.toLocaleString("en-IN")} lead${n === 1 ? "" : "s"}`;
+    if (!confirm(`Delete ${what} and their whole history? This can't be undone.`)) return;
+    startDelete(async () => {
+      try {
+        await deleteLeadsAction(target);
+        clear();
+        router.refresh();
+      } catch {
+        alert("Couldn't reach the server — check your connection and try again.");
+      }
+    });
+  }
+
   const Check = ({ id, label }: { id: number; label: string }) => (
     <input type="checkbox" checked={allMatching || sel.has(id)} onChange={() => toggle(id)} aria-label={`Select ${label}`} className="h-4 w-4 cursor-pointer accent-[var(--color-blue)]" />
   );
@@ -63,7 +80,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
           <thead>
             <tr>
               <th className="w-10"><input type="checkbox" checked={allMatching || allOnPage} onChange={togglePage} aria-label="Select all on this page" className="h-4 w-4 cursor-pointer accent-[var(--color-blue)]" /></th>
-              <th>Lead</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th>
+              <th>Lead</th><th>Stage</th><th>Service</th><th>Source</th><th className="text-right">Value</th><th>Next follow-up</th><th>Added</th><th className="w-10" />
             </tr>
           </thead>
           <tbody>
@@ -85,6 +102,11 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
                 <td className="text-right tabular-nums">{l.value ? inr(l.value) : "—"}</td>
                 <td suppressHydrationWarning className={l.next_followup_at && new Date(l.next_followup_at) < new Date() ? "text-amber-300" : "text-[var(--crm-ink-2)]"}>{fmtDate(l.next_followup_at, true)}</td>
                 <td suppressHydrationWarning className="text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</td>
+                <td>
+                  <button disabled={deleting} onClick={() => remove({ ids: [l.id], filter: null }, 1, l.name)} className="rounded p-1 text-[var(--crm-ink-3)] hover:bg-rose-500/10 hover:text-rose-300" aria-label={`Delete ${l.name}`} title="Delete lead">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -103,6 +125,9 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
               </span>
               <span suppressHydrationWarning className="text-xs text-[var(--crm-ink-3)]">{timeAgo(l.created_at)}</span>
             </Link>
+            <button disabled={deleting} onClick={() => remove({ ids: [l.id], filter: null }, 1, l.name)} className="rounded p-1 text-[var(--crm-ink-3)] hover:text-rose-300" aria-label={`Delete ${l.name}`}>
+              <Trash2 className="h-4 w-4" />
+            </button>
           </li>
         ))}
       </ul>
@@ -119,6 +144,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, emailReady }:
               )}
               <span className="ml-auto flex gap-2">
                 <button onClick={() => setOpen((o) => !o)} className="crm-btn crm-btn-primary crm-btn-sm"><CalendarClock className="h-3.5 w-3.5" /> Schedule email</button>
+                <button disabled={deleting} onClick={() => remove(allMatching ? { ids: null, filter } : { ids: [...sel], filter: null }, count)} className="crm-btn crm-btn-danger crm-btn-sm"><Trash2 className="h-3.5 w-3.5" /> {deleting ? "Deleting…" : "Delete"}</button>
                 <button onClick={clear} className="crm-btn crm-btn-ghost crm-btn-sm" aria-label="Clear selection"><X className="h-3.5 w-3.5" /></button>
               </span>
             </div>
