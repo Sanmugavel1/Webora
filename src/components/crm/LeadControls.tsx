@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Mail, MessageCircle, Phone, Reply } from "lucide-react";
-import { markRepliedAction, moveStageAction, sendMessageAction } from "@/app/crm/actions";
+import { markRepliedAction, moveStageAction, sendMessageAction, whatsappOpenedAction } from "@/app/crm/actions";
 import { STAGES, type StageId } from "@/lib/crm/config";
 import { mailtoLink, renderTemplate, waLink } from "@/lib/crm/template";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,7 @@ export function QuickActions({ lead }: { lead: LeadLite }) {
     <div className="flex flex-wrap gap-2">
       {lead.phone && (
         <>
-          <a href={waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `)} target="_blank" rel="noopener noreferrer" className="crm-btn crm-btn-wa crm-btn-sm"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
+          <a href={waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `)} target="_blank" rel="noopener noreferrer" onClick={() => start(() => whatsappOpenedAction(lead.id))} className="crm-btn crm-btn-wa crm-btn-sm"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
           <a href={`tel:${lead.phone}`} className="crm-btn crm-btn-ghost crm-btn-sm"><Phone className="h-3.5 w-3.5" /> Call</a>
         </>
       )}

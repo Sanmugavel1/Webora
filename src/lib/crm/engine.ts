@@ -157,6 +157,12 @@ export async function changeStage(leadId: number, stage: StageId, userId: number
   await enrollForTrigger(leadId, [`stage:${stage}`]);
 }
 
+/** Any message actually sent to a "New" lead means they've been contacted. */
+export async function markContacted(leadId: number, userId: number | null = null) {
+  const lead = await q1<{ stage: StageId }>("SELECT stage FROM crm_leads WHERE id = $1", [leadId]);
+  if (lead?.stage === "new") await changeStage(leadId, "contacted", userId);
+}
+
 type Delivery = { status: "sent" | "queued" | "failed" | "skipped"; error: string; to: string };
 
 /** Delivers one rendered message, falling back to the manual outbox when a channel isn't connected. */
@@ -190,12 +196,14 @@ export async function recordMessage(
   body: string,
   d: Delivery,
   enrollmentId: number | null,
+  userId: number | null = null,
 ) {
   await q(
     `INSERT INTO crm_messages (lead_id, enrollment_id, channel, to_addr, subject, body, status, error, sent_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, CASE WHEN $7 = 'sent' THEN now() END)`,
     [lead.id, enrollmentId, channel, d.to, subject, body, d.status, d.error],
   );
+  if (d.status === "sent") await markContacted(lead.id, userId);
 }
 
 const STATUS_WORDS = { sent: "sent", queued: "ready in Outbox to send", failed: "failed", skipped: "skipped" } as const;
@@ -434,8 +442,7 @@ export async function runScheduledEmails(opts: { deadline?: number } = {}) {
         await sendEmail(m.to_addr, m.subject, m.body);
         await q("UPDATE crm_messages SET status = 'sent', sent_at = now(), error = '' WHERE id = $1", [m.id]);
         await logActivity(m.lead_id, "email", `Scheduled email “${m.subject}” sent to ${m.to_addr}`);
-        const lead = await q1<{ stage: StageId }>("SELECT stage FROM crm_leads WHERE id = $1", [m.lead_id]);
-        if (lead?.stage === "new") await changeStage(m.lead_id, "contacted", null);
+        await markContacted(m.lead_id);
         sent++;
       } catch (e) {
         await q("UPDATE crm_messages SET status = 'failed', error = $2 WHERE id = $1", [m.id, (e as Error).message]);

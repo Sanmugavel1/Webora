@@ -19,7 +19,7 @@ function pool() {
 }
 
 /** Bump whenever SCHEMA below changes, so already-set-up databases run it once more. */
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS crm_meta (version INTEGER NOT NULL);
@@ -143,6 +143,13 @@ CREATE TABLE IF NOT EXISTS crm_tasks (
   done BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- New leads that were already sent a WhatsApp count as contacted.
+WITH moved AS (
+  UPDATE crm_leads l SET stage = 'contacted', stage_changed_at = now(), updated_at = now()
+  WHERE l.stage = 'new' AND EXISTS (SELECT 1 FROM crm_messages m WHERE m.lead_id = l.id AND m.channel = 'whatsapp' AND m.status = 'sent')
+  RETURNING l.id
+)
+INSERT INTO crm_activities (lead_id, type, body) SELECT id, 'stage', 'New → Contacted (WhatsApp already sent)' FROM moved;
 `;
 
 async function seed(client: PoolClient) {

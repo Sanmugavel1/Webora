@@ -19,6 +19,7 @@ import {
   LEAD_SELECT,
   logActivity,
   type Lead,
+  markContacted,
   recordMessage,
   runDueFollowups,
   runScheduledEmails,
@@ -261,8 +262,15 @@ export async function markRepliedAction(id: number) {
   const user = await requireUser();
   await logActivity(id, "reply", "Lead replied — automated follow-ups paused", user.id);
   await stopEnrollments(id, "lead replied", user.id);
-  const lead = await getLead(id);
-  if (lead?.stage === "new") await changeStage(id, "contacted", user.id);
+  await markContacted(id, user.id);
+  refresh(id);
+}
+
+/** The WhatsApp button opens the chat on this device; opening it counts as contacting a new lead. */
+export async function whatsappOpenedAction(id: number) {
+  const user = await requireUser();
+  await logActivity(id, "whatsapp", "WhatsApp chat opened from the CRM", user.id);
+  await markContacted(id, user.id);
   refresh(id);
 }
 
@@ -287,14 +295,13 @@ export async function sendMessageAction(input: { leadId: number; channel: string
   const d = input.manual
     ? { status: "sent" as const, error: "", to: input.channel === "email" ? lead.email : lead.phone }
     : await deliver(lead, input.channel, input.subject, input.body);
-  await recordMessage(lead, input.channel, input.subject, input.body, d, null);
+  await recordMessage(lead, input.channel, input.subject, input.body, d, null, user.id);
   await logActivity(
     lead.id,
     input.channel === "email" ? "email" : "whatsapp",
     `${input.channel === "email" ? `Email “${input.subject}”` : "WhatsApp message"} ${d.status === "sent" ? "sent" : d.status}${d.error ? ` (${d.error})` : ""}:\n${input.body}`,
     user.id,
   );
-  if (lead.stage === "new" && d.status === "sent") await changeStage(lead.id, "contacted", user.id);
   refresh(lead.id);
   return { status: d.status, error: d.error };
 }
@@ -430,8 +437,7 @@ export async function markMessageSentAction(id: number) {
   );
   if (m) {
     await logActivity(m.lead_id, m.channel, `Follow-up ${m.channel === "email" ? "email" : "WhatsApp"} sent from Outbox`, user.id);
-    const lead = await getLead(m.lead_id);
-    if (lead?.stage === "new") await changeStage(m.lead_id, "contacted", user.id);
+    await markContacted(m.lead_id, user.id);
   }
   refresh(m?.lead_id);
 }
