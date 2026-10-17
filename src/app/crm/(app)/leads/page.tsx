@@ -34,10 +34,11 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
   const w = leadWhere({ q: term, stage, source, tag, domain });
   const order = { recent: "l.created_at DESC", updated: "l.updated_at DESC", value: "l.value DESC", followup: "l.next_followup_at ASC NULLS LAST" }[sort] ?? "l.created_at DESC";
 
-  const [leads, countRow, emailTemplates] = await Promise.all([
+  const [leads, countRow, emailTemplates, domains] = await Promise.all([
     q<Lead>(`${LEAD_SELECT} ${w.sql} ORDER BY ${order}, l.id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`, w.params),
     q<{ n: number }>(`SELECT count(*)::int AS n FROM crm_leads l ${w.sql}`, w.params),
     q<{ id: number; name: string; subject: string; body: string }>("SELECT id, name, subject, body FROM crm_templates WHERE channel = 'email' ORDER BY name"),
+    q<{ domain: string; n: number }>("SELECT mode() WITHIN GROUP (ORDER BY trim(domain)) AS domain, count(*)::int AS n FROM crm_leads WHERE trim(domain) <> '' GROUP BY lower(trim(domain)) ORDER BY 1"),
   ]);
   const total = countRow[0]?.n ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -78,6 +79,11 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
           <option value="">All sources</option>
           {SOURCES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
+        <select name="domain" defaultValue={domains.find((d) => d.domain.toLowerCase() === domain.toLowerCase())?.domain ?? domain} className="crm-input w-auto" aria-label="Domain">
+          <option value="">All domains</option>
+          {domains.map((d) => <option key={d.domain} value={d.domain}>{d.domain} ({d.n.toLocaleString("en-IN")})</option>)}
+          <option value={NO_DOMAIN}>No domain set</option>
+        </select>
         <select name="sort" defaultValue={sort} className="crm-input w-auto" aria-label="Sort">
           <option value="recent">Newest</option>
           <option value="updated">Recently active</option>
@@ -85,7 +91,6 @@ export default async function LeadsPage({ searchParams }: PageProps<"/crm/leads"
           <option value="followup">Next follow-up</option>
         </select>
         {tag && <input type="hidden" name="tag" value={tag} />}
-        {domain && <input type="hidden" name="domain" value={domain} />}
         <button className="crm-btn crm-btn-ghost">Filter</button>
         {filtered && <Link href="/crm/leads" className="crm-btn crm-btn-ghost">Clear</Link>}
       </form>
