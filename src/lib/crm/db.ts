@@ -13,12 +13,16 @@ function pool() {
   if (!globalForPg.crmPool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error("DATABASE_URL is not set — the CRM needs a Postgres database.");
-    globalForPg.crmPool = new Pool({ connectionString, max: 3 });
+    globalForPg.crmPool = new Pool({ connectionString, max: 5 });
   }
   return globalForPg.crmPool;
 }
 
+/** Bump whenever SCHEMA below changes, so already-set-up databases run it once more. */
+const SCHEMA_VERSION = 3;
+
 const SCHEMA = `
+CREATE TABLE IF NOT EXISTS crm_meta (version INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS crm_users (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
@@ -161,10 +165,25 @@ async function seed(client: PoolClient) {
   }
 }
 
-/** Creates tables + starter templates/sequences on first use (idempotent). */
+async function schemaIsCurrent() {
+  try {
+    const { rows } = await pool().query<{ version: number }>("SELECT max(version) AS version FROM crm_meta");
+    return (rows[0]?.version ?? 0) >= SCHEMA_VERSION;
+  } catch {
+    return false; // crm_meta doesn't exist yet
+  }
+}
+
+/**
+ * Creates tables + starter templates/sequences on first use (idempotent).
+ * A cold start normally costs one tiny query; the DDL only runs when
+ * SCHEMA_VERSION goes up, because DDL takes table locks that would make
+ * page loads wait behind any lead update in progress.
+ */
 function ensureSchema() {
   if (!globalForPg.crmSchema) {
     globalForPg.crmSchema = (async () => {
+      if (await schemaIsCurrent()) return;
       const client = await pool().connect();
       // Transaction-scoped lock: a session lock leaks through Neon's pooler
       // (unlock can land on a different backend) and then blocks every cold start.
@@ -173,6 +192,8 @@ function ensureSchema() {
         await client.query("SELECT pg_advisory_xact_lock(424243)");
         await client.query(SCHEMA);
         await seed(client);
+        await client.query("DELETE FROM crm_meta");
+        await client.query("INSERT INTO crm_meta (version) VALUES ($1)", [SCHEMA_VERSION]);
         await client.query("COMMIT");
       } catch (err) {
         await client.query("ROLLBACK").catch(() => {});

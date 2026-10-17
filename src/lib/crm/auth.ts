@@ -3,6 +3,7 @@ import { createHmac, randomBytes, scrypt as scryptCb, timingSafeEqual } from "no
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { q, q1 } from "./db";
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
@@ -99,11 +100,12 @@ export async function logout() {
   (await cookies()).delete(SESSION_COOKIE);
 }
 
-export async function currentUser(): Promise<CrmUser | null> {
+/** Cached per request, so a layout and its page share one lookup. */
+export const currentUser = cache(async (): Promise<CrmUser | null> => {
   const id = readToken((await cookies()).get(SESSION_COOKIE)?.value);
   if (!id) return null;
   return (await q1<CrmUser>("SELECT id, name, email, role FROM crm_users WHERE id = $1", [id])) ?? null;
-}
+});
 
 /** Use at the top of every CRM page, server action and API route. */
 export async function requireUser() {
