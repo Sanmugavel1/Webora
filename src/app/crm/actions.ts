@@ -8,7 +8,7 @@ import { q, q1 } from "@/lib/crm/db";
 import { leadWhere, type LeadFilter } from "@/lib/crm/leadQuery";
 import { channelStatus, renderTemplate, sendEmail } from "@/lib/crm/messaging";
 import { PUBLIC_SITE_URL } from "@/lib/crm/config";
-import { CHANNELS, STAGE_IDS, TRIGGERS, type SequenceStep, type StageId } from "@/lib/crm/config";
+import { CHANNELS, NO_WHATSAPP_TAG, STAGE_IDS, TRIGGERS, type SequenceStep, type StageId } from "@/lib/crm/config";
 import {
   changeStage,
   createOrMergeLead,
@@ -268,8 +268,11 @@ export async function markRepliedAction(id: number) {
   refresh(id);
 }
 
-/** The WhatsApp button opens the chat on this device; opening it counts as contacting a new lead. */
-export async function whatsappOpenedAction(id: number, body = "", formatName = "") {
+/**
+ * Called once the agent confirms the WhatsApp message actually went out —
+ * just opening the chat isn't contact (the number may not be on WhatsApp).
+ */
+export async function whatsappSentAction(id: number, body = "", formatName = "") {
   const user = await requireUser();
   if (body.trim()) {
     await q(
@@ -280,6 +283,30 @@ export async function whatsappOpenedAction(id: number, body = "", formatName = "
   }
   await logActivity(id, "whatsapp", body.trim() ? `WhatsApp${formatName ? ` “${formatName}”` : ""} sent:\n${body}` : "WhatsApp chat opened from the CRM", user.id);
   await markContacted(id, user.id);
+  refresh(id);
+}
+
+/**
+ * The number isn't on WhatsApp: tag the lead, drop its queued WhatsApp
+ * follow-ups and keep future ones from being queued. The stage is left alone.
+ * Pass a lead id, or an Outbox message id to find the lead from.
+ */
+export async function noWhatsappAction(target: { leadId: number } | { messageId: number }) {
+  const user = await requireUser();
+  const id = "leadId" in target
+    ? target.leadId
+    : (await q1<{ lead_id: number }>("SELECT lead_id FROM crm_messages WHERE id = $1", [target.messageId]))?.lead_id;
+  if (!id) return;
+  await q(
+    `UPDATE crm_leads SET tags = array_append(tags, $2), updated_at = now() WHERE id = $1 AND NOT ($2 = ANY(tags))`,
+    [id, NO_WHATSAPP_TAG],
+  );
+  await q(
+    `UPDATE crm_messages SET status = 'skipped', error = 'Number isn''t on WhatsApp'
+     WHERE lead_id = $1 AND channel = 'whatsapp' AND status = 'queued'`,
+    [id],
+  );
+  await logActivity(id, "whatsapp", "Number isn't on WhatsApp — tagged #no-whatsapp, WhatsApp follow-ups will be skipped", user.id);
   refresh(id);
 }
 

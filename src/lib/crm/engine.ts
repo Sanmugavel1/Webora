@@ -1,6 +1,6 @@
 import "server-only";
 import { q, q1, tx } from "./db";
-import { STAGE_IDS, stageOf, type SequenceStep, type StageId } from "./config";
+import { NO_WHATSAPP_TAG, STAGE_IDS, stageOf, type SequenceStep, type StageId } from "./config";
 import { channelStatus, renderTemplate, sendEmail, sendWhatsAppApi } from "./messaging";
 
 export type Lead = {
@@ -179,6 +179,7 @@ export async function deliver(lead: Lead, channel: string, subject: string, body
     }
   }
   if (!lead.phone) return { status: "skipped", error: "Lead has no phone number", to: "" };
+  if (lead.tags.includes(NO_WHATSAPP_TAG)) return { status: "skipped", error: "Number isn't on WhatsApp", to: lead.phone };
   if (!ch.whatsappApi) return { status: "queued", error: "", to: lead.phone };
   try {
     await sendWhatsAppApi(lead.phone, body);

@@ -4,11 +4,12 @@ import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, MessageCircle, Pencil, Shapes, SkipForward, Trash2, X } from "lucide-react";
-import { deleteLeadsAction, scheduleEmailAction, setDomainAction, whatsappOpenedAction } from "@/app/crm/actions";
-import { sourceLabel, type StageId } from "@/lib/crm/config";
+import { deleteLeadsAction, noWhatsappAction, scheduleEmailAction, setDomainAction, whatsappSentAction } from "@/app/crm/actions";
+import { NO_WHATSAPP_TAG, sourceLabel, type StageId } from "@/lib/crm/config";
 import { fmtDate, inr, timeAgo } from "@/lib/crm/format";
 import { renderTemplate, waLink } from "@/lib/crm/template";
 import { StageBadge } from "./ui";
+import { WaConfirm } from "./WaConfirm";
 import { cn } from "@/lib/utils";
 
 export type LeadRow = {
@@ -118,7 +119,7 @@ export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, 
           ))}
         </select>
         <Link href={filter.domain && filter.domain !== "none" ? `/crm/templates/new?domain=${encodeURIComponent(filter.domain)}` : "/crm/templates/new"} className="text-xs text-[#8fbcff] hover:underline">+ new format</Link>
-        <span className="text-xs text-[var(--crm-ink-3)]">Tap 💬 on a lead → pick a format (this one is marked “chosen”) → WhatsApp opens with it ready, and the lead moves to Contacted. Or tick leads → “Send WhatsApp” to go one after another.</span>
+        <span className="text-xs text-[var(--crm-ink-3)]">Tap 💬 on a lead → pick a format (this one is marked “chosen”) → WhatsApp opens with it ready → come back and tap “Sent” (moves it to Contacted) or “Not on WhatsApp” (tags it, stage unchanged). Or tick leads → “Send WhatsApp” to go one after another.</span>
       </div>
 
       <div className="crm-card hidden overflow-x-auto md:block">
@@ -207,8 +208,8 @@ export function LeadsTable({ leads, total, filter, emailTemplates, waTemplates, 
             </div>
             {open === "whatsapp" && (
               <WhatsAppQueue
-                leads={leads.filter((l) => (allMatching || sel.has(l.id)) && l.phone)}
-                skipped={leads.filter((l) => (allMatching || sel.has(l.id)) && !l.phone).length}
+                leads={leads.filter((l) => (allMatching || sel.has(l.id)) && l.phone && !l.tags.includes(NO_WHATSAPP_TAG))}
+                skipped={leads.filter((l) => (allMatching || sel.has(l.id)) && (!l.phone || l.tags.includes(NO_WHATSAPP_TAG))).length}
                 more={allMatching && total > leads.length}
                 tpl={waTpl}
                 onDone={() => { clear(); router.refresh(); }}
@@ -239,18 +240,28 @@ function waMessage(lead: LeadRow, tpl: WaTpl | null) {
 
 /**
  * 💬 on a row: a small menu of formats for this lead (its domain's formats
- * first, then all-domain ones). Picking one opens WhatsApp already filled in,
- * and a "New" lead moves to "Contacted".
+ * first, then all-domain ones). Picking one opens WhatsApp already filled in;
+ * the lead only moves New → Contacted once the agent confirms it was sent.
  */
 function WhatsAppLink({ lead, tpl, all, className }: { lead: LeadRow; tpl: WaTpl | null; all: WaTpl[]; className: string }) {
   const router = useRouter();
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [opened, setOpened] = useState<{ t: WaTpl | null; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const noWa = lead.tags.includes(NO_WHATSAPP_TAG);
   const own = (t: WaTpl) => !!lead.domain && t.domain.toLowerCase() === lead.domain.toLowerCase();
   const options = all.filter((t) => !t.domain || own(t)).sort((a, b) => Number(own(b)) - Number(own(a)));
   if (tpl && !options.some((t) => t.id === tpl.id)) options.unshift(tpl);
 
+  function close() { setPos(null); setOpened(null); }
+
+  function finish(action: Promise<unknown>) {
+    setBusy(true);
+    action.then(() => router.refresh(), () => {}).finally(() => { setBusy(false); close(); });
+  }
+
   function toggle(e: React.MouseEvent<HTMLButtonElement>) {
-    if (pos) return setPos(null);
+    if (pos) return close();
     const r = e.currentTarget.getBoundingClientRect();
     // Fixed position so the table's scroll box can't clip it; flip up near the bottom.
     const h = Math.min(320, 44 + (options.length + 1) * 40);
@@ -265,7 +276,7 @@ function WhatsAppLink({ lead, tpl, all, className }: { lead: LeadRow; tpl: WaTpl
         href={waLink(lead.phone, text)}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={() => { setPos(null); whatsappOpenedAction(lead.id, t ? text : "", t?.name).then(() => router.refresh(), () => {}); }}
+        onClick={() => setOpened({ t, text })}
         className="block rounded-lg px-3 py-2 text-left hover:bg-white/10"
         title={text}
       >
@@ -281,16 +292,30 @@ function WhatsAppLink({ lead, tpl, all, className }: { lead: LeadRow; tpl: WaTpl
 
   return (
     <>
-      <button onClick={toggle} className={className} aria-label={`WhatsApp ${lead.name}`} aria-expanded={!!pos} title="Choose a format and open WhatsApp (moves New → Contacted)">
+      <button onClick={toggle} className={cn(className, noWa && "opacity-40")} aria-label={`WhatsApp ${lead.name}`} aria-expanded={!!pos} title={noWa ? "Marked as not on WhatsApp — open anyway" : "Choose a format and open WhatsApp"}>
         <MessageCircle className="h-4 w-4" />
       </button>
       {pos && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setPos(null)} />
+          <div className="fixed inset-0 z-40" onClick={() => !busy && close()} />
           <div className="crm-card fixed z-50 max-h-80 w-72 overflow-y-auto p-1.5 shadow-2xl shadow-black/50" style={{ top: pos.top, left: pos.left, background: "var(--crm-panel-2)" }}>
-            <p className="px-3 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--crm-ink-3)]">WhatsApp {lead.name.split(" ")[0]} with…</p>
-            {options.map((t) => item(t))}
-            {item(null)}
+            {opened ? (
+              <div className="p-2">
+                <p className="mb-2 text-sm font-medium">{lead.name} <span className="font-normal text-[var(--crm-ink-3)]">{lead.phone}</span></p>
+                <WaConfirm
+                  busy={busy}
+                  onSent={() => finish(whatsappSentAction(lead.id, opened.t ? opened.text : "", opened.t?.name))}
+                  onNoWhatsapp={() => finish(noWhatsappAction({ leadId: lead.id }))}
+                  onCancel={close}
+                />
+              </div>
+            ) : (
+              <>
+                <p className="px-3 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--crm-ink-3)]">WhatsApp {lead.name.split(" ")[0]} with…</p>
+                {options.map((t) => item(t))}
+                {item(null)}
+              </>
+            )}
           </div>
         </>
       )}
@@ -300,16 +325,20 @@ function WhatsAppLink({ lead, tpl, all, className }: { lead: LeadRow; tpl: WaTpl
 
 /**
  * One tap per lead: browsers only let a click open one WhatsApp tab, so the
- * ticked leads are sent in turn — each tap opens the next chat, already filled in.
+ * ticked leads are sent in turn. After each chat opens the agent says whether
+ * it went through, so numbers not on WhatsApp aren't marked "Contacted".
  */
 function WhatsAppQueue({ leads, skipped, more, tpl, onDone }: { leads: LeadRow[]; skipped: number; more: boolean; tpl: WaTpl | null; onDone: () => void }) {
   const [i, setI] = useState(0);
   const [sent, setSent] = useState(0);
+  const [noWa, setNoWa] = useState(0);
+  const [waiting, setWaiting] = useState(false);
   const cur = leads[i];
+  const next = () => { setWaiting(false); setI((n) => n + 1); };
   if (!cur) {
     return (
       <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--crm-line)] pt-3 text-sm">
-        <span>✅ Done — {sent} WhatsApp{sent === 1 ? "" : "s"} opened{skipped ? `, ${skipped} skipped (no phone)` : ""}.</span>
+        <span>✅ Done — {sent} WhatsApp{sent === 1 ? "" : "s"} sent{noWa ? `, ${noWa} not on WhatsApp` : ""}{skipped ? `, ${skipped} skipped (no phone / not on WhatsApp)` : ""}.</span>
         <button onClick={onDone} className="crm-btn crm-btn-ghost crm-btn-sm">Close</button>
       </div>
     );
@@ -319,24 +348,28 @@ function WhatsAppQueue({ leads, skipped, more, tpl, onDone }: { leads: LeadRow[]
     <div className="mt-3 grid gap-3 border-t border-[var(--crm-line)] pt-3 lg:grid-cols-[1fr_1.2fr]">
       <div className="space-y-2 text-sm">
         <p className="text-[var(--crm-ink-2)]">
-          {i + 1} of {leads.length}{skipped ? ` · ${skipped} without phone skipped` : ""}{more ? " · this page only" : ""} · format: <b>{tpl?.name ?? "Just “Hi name,”"}</b>
+          {i + 1} of {leads.length}{skipped ? ` · ${skipped} skipped (no phone / not on WhatsApp)` : ""}{more ? " · this page only" : ""} · format: <b>{tpl?.name ?? "Just “Hi name,”"}</b>
         </p>
         <p className="text-base font-semibold">{cur.name} <span className="text-sm font-normal text-[var(--crm-ink-3)]">{cur.phone}</span></p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => {
-              window.open(waLink(cur.phone, text), "_blank", "noopener");
-              whatsappOpenedAction(cur.id, tpl ? text : "", tpl?.name).catch(() => {});
-              setSent((n) => n + 1);
-              setI(i + 1);
-            }}
-            className="crm-btn crm-btn-wa"
-          >
-            <MessageCircle className="h-4 w-4" /> Open WhatsApp{i + 1 < leads.length ? " & next" : ""}
-          </button>
-          <button onClick={() => setI((n) => n + 1)} className="crm-btn crm-btn-ghost"><SkipForward className="h-4 w-4" /> Skip</button>
-        </div>
-        <p className="text-xs text-[var(--crm-ink-3)]">Press Send in WhatsApp, come back here and tap again for the next lead.</p>
+        {waiting ? (
+          <WaConfirm
+            next={i + 1 < leads.length}
+            onSent={() => { whatsappSentAction(cur.id, tpl ? text : "", tpl?.name).catch(() => {}); setSent((n) => n + 1); next(); }}
+            onNoWhatsapp={() => { noWhatsappAction({ leadId: cur.id }).catch(() => {}); setNoWa((n) => n + 1); next(); }}
+            onCancel={() => setWaiting(false)}
+          />
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => { window.open(waLink(cur.phone, text), "_blank", "noopener"); setWaiting(true); }}
+              className="crm-btn crm-btn-wa"
+            >
+              <MessageCircle className="h-4 w-4" /> Open WhatsApp
+            </button>
+            <button onClick={next} className="crm-btn crm-btn-ghost"><SkipForward className="h-4 w-4" /> Skip</button>
+          </div>
+        )}
+        <p className="text-xs text-[var(--crm-ink-3)]">Press Send in WhatsApp, then come back and tell the CRM whether it went through.</p>
       </div>
       <p className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded-xl bg-[#0b141a] p-3 text-[13px] leading-relaxed text-[#e9edef]">{text}</p>
     </div>

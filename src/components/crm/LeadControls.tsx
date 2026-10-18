@@ -2,10 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { Mail, MessageCircle, Phone, Reply } from "lucide-react";
-import { markRepliedAction, moveStageAction, sendMessageAction, whatsappOpenedAction } from "@/app/crm/actions";
+import { markRepliedAction, moveStageAction, noWhatsappAction, sendMessageAction, whatsappSentAction } from "@/app/crm/actions";
 import { STAGES, type StageId } from "@/lib/crm/config";
 import { mailtoLink, renderTemplate, waLink } from "@/lib/crm/template";
 import { cn } from "@/lib/utils";
+import { WaConfirm } from "./WaConfirm";
 
 type LeadLite = { id: number; name: string; business: string; domain: string; service: string; agent_name: string | null; phone: string; email: string; stage: StageId };
 type Tpl = { id: number; name: string; channel: string; subject: string; body: string; domain: string };
@@ -36,11 +37,13 @@ export function StageBar({ id, stage }: { id: number; stage: StageId }) {
 
 export function QuickActions({ lead }: { lead: LeadLite }) {
   const [pending, start] = useTransition();
+  const [asking, setAsking] = useState(false);
+  const done = (action: () => Promise<unknown>) => start(async () => { await action(); setAsking(false); });
   return (
     <div className="flex flex-wrap gap-2">
       {lead.phone && (
         <>
-          <a href={waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `)} target="_blank" rel="noopener noreferrer" onClick={() => start(() => whatsappOpenedAction(lead.id))} className="crm-btn crm-btn-wa crm-btn-sm"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
+          <a href={waLink(lead.phone, `Hi ${lead.name.split(" ")[0]}, `)} target="_blank" rel="noopener noreferrer" onClick={() => setAsking(true)} className="crm-btn crm-btn-wa crm-btn-sm"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
           <a href={`tel:${lead.phone}`} className="crm-btn crm-btn-ghost crm-btn-sm"><Phone className="h-3.5 w-3.5" /> Call</a>
         </>
       )}
@@ -48,6 +51,15 @@ export function QuickActions({ lead }: { lead: LeadLite }) {
       <button disabled={pending} onClick={() => start(() => markRepliedAction(lead.id))} className="crm-btn crm-btn-ghost crm-btn-sm" title="Stops automated follow-ups for this lead">
         <Reply className="h-3.5 w-3.5" /> They replied
       </button>
+      {asking && (
+        <WaConfirm
+          className="w-full"
+          busy={pending}
+          onSent={() => done(() => whatsappSentAction(lead.id))}
+          onNoWhatsapp={() => done(() => noWhatsappAction({ leadId: lead.id }))}
+          onCancel={() => setAsking(false)}
+        />
+      )}
     </div>
   );
 }
@@ -57,6 +69,7 @@ export function Composer({ lead, templates, emailReady }: { lead: LeadLite; temp
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [note, setNote] = useState("");
+  const [asking, setAsking] = useState(false);
   const [pending, start] = useTransition();
   // This lead's domain formats first, then the all-domain ones.
   const own = (t: Tpl) => !!lead.domain && t.domain.toLowerCase() === lead.domain.toLowerCase();
@@ -73,8 +86,9 @@ export function Composer({ lead, templates, emailReady }: { lead: LeadLite; temp
   function send() {
     setNote("");
     if (channel === "whatsapp") {
+      // Logged only once the agent confirms it went through (see WaConfirm below).
       window.open(waLink(lead.phone, body), "_blank", "noopener");
-      start(async () => { await sendMessageAction({ leadId: lead.id, channel, subject: "", body, manual: true }); setBody(""); setNote("Logged as sent."); });
+      setAsking(true);
     } else if (emailReady) {
       start(async () => {
         const r = await sendMessageAction({ leadId: lead.id, channel, subject, body, manual: false });
@@ -104,6 +118,15 @@ export function Composer({ lead, templates, emailReady }: { lead: LeadLite; temp
       </div>
       {channel === "email" && <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="crm-input mb-2" />}
       <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} placeholder={target ? `Write to ${target}…` : `This lead has no ${channel === "email" ? "email" : "phone number"} yet.`} className="crm-input resize-y" />
+      {asking && channel === "whatsapp" && (
+        <WaConfirm
+          className="mt-2"
+          busy={pending}
+          onSent={() => start(async () => { await sendMessageAction({ leadId: lead.id, channel, subject: "", body, manual: true }); setBody(""); setAsking(false); setNote("Logged as sent."); })}
+          onNoWhatsapp={() => start(async () => { await noWhatsappAction({ leadId: lead.id }); setAsking(false); setNote("Marked as not on WhatsApp."); })}
+          onCancel={() => setAsking(false)}
+        />
+      )}
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-[var(--crm-ink-3)]">
           {note || (channel === "whatsapp" ? "Opens WhatsApp with this message ready — just tap send." : emailReady ? "Sends from your connected Gmail." : "Opens your mail app (connect Gmail in Settings to send directly).")}

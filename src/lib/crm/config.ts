@@ -13,6 +13,9 @@ export type StageId = (typeof STAGES)[number]["id"];
 export const STAGE_IDS = STAGES.map((s) => s.id) as StageId[];
 export const OPEN_STAGES: StageId[] = ["new", "contacted", "qualified", "proposal"];
 
+/** Tag put on a lead whose number turned out not to be on WhatsApp. */
+export const NO_WHATSAPP_TAG = "no-whatsapp";
+
 export function stageOf(id: string) {
   return STAGES.find((s) => s.id === id) ?? STAGES[0];
 }
