@@ -27,8 +27,10 @@ export function normalisePhone(raw: string) {
   return d;
 }
 
+// Link straight to api.whatsapp.com: the wa.me redirect re-encodes ?text= and
+// turns emoji outside the BMP (🎆, 🌐, 💬…) into "�" in the chat box.
 export function waLink(phone: string, text: string) {
-  return `https://wa.me/${normalisePhone(phone)}?text=${encodeURIComponent(text)}`;
+  return `https://api.whatsapp.com/send?phone=${normalisePhone(phone)}&text=${encodeURIComponent(text)}`;
 }
 
 export function mailtoLink(email: string, subject: string, body: string) {
